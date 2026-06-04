@@ -1,10 +1,13 @@
 """
-Lecture to Anki – Web App
-FastAPI backend: upload MP4 → Whisper → Claude → .apkg download
+DarwinCards – Web App
+FastAPI backend: upload file → Claude → .apkg download
+
+Supported inputs: .mp4/.mov/.mkv (video), .mp3/.m4a/.wav (audio),
+                  .txt (transcript), .pdf (slides), .pptx (slides)
 
 Endpoints
 ---------
-POST /api/generate          Upload MP4 + options, returns {job_id}
+POST /api/generate          Upload file + options, returns {job_id}
 GET  /api/progress/{job_id} SSE stream of progress messages + final status
 GET  /api/download/{job_id} Download the generated .apkg file
 GET  /                      Serve the frontend
@@ -22,19 +25,19 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
 
-from pipeline import generate_cards_from_video
+from pipeline import generate_cards_from_file, VIDEO_EXTS, AUDIO_EXTS
 
 # ---------------------------------------------------------------------------
 # App setup
 # ---------------------------------------------------------------------------
 
-app = FastAPI(title="Lecture to Anki")
+app = FastAPI(title="DarwinCards")
 
 STATIC_DIR = Path(__file__).parent / "static"
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-# In-memory job store  {job_id: {"status": ..., "messages": [], "apkg_path": ...}}
+# In-memory job store
 jobs: Dict[str, Any] = {}
 
 # ---------------------------------------------------------------------------
@@ -46,7 +49,7 @@ async def serve_frontend():
     index = STATIC_DIR / "index.html"
     if index.exists():
         return HTMLResponse(index.read_text())
-    return HTMLResponse("<h1>Lecture to Anki API is running</h1>")
+    return HTMLResponse("<h1>DarwinCards API is running</h1>")
 
 
 # ---------------------------------------------------------------------------
@@ -55,35 +58,46 @@ async def serve_frontend():
 
 @app.post("/api/generate")
 async def start_generation(
-    video: UploadFile = File(...),
-    openai_api_key: str = Form(...),
+    file: UploadFile = File(...),
+    openai_api_key: str = Form(""),
     anthropic_api_key: str = Form(...),
-    deck_name: str = Form("Lecture Cards"),
+    deck_name: str = Form("DarwinCards Deck"),
     card_type: str = Form("both"),
     cards_per_chunk: int = Form(8),
     language: str = Form("en"),
     claude_model: str = Form("claude-opus-4-6"),
     tags: str = Form(""),
 ):
+    ext = Path(file.filename).suffix.lower()
+
+    # OpenAI key only required for video/audio
+    needs_openai = ext in VIDEO_EXTS or ext in AUDIO_EXTS
+    if needs_openai and not openai_api_key.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="OpenAI API key is required for video and audio files."
+        )
+    if not anthropic_api_key.strip():
+        raise HTTPException(status_code=400, detail="Anthropic API key is required.")
+
     job_id = str(uuid.uuid4())
     jobs[job_id] = {"status": "running", "messages": [], "apkg_path": None, "error": None}
 
-    # Save uploaded video to a temp file
-    suffix = Path(video.filename).suffix or ".mp4"
-    tmp_video = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
-    contents = await video.read()
-    tmp_video.write(contents)
-    tmp_video.close()
+    # Save uploaded file to temp
+    suffix = ext or ".tmp"
+    tmp_file = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+    contents = await file.read()
+    tmp_file.write(contents)
+    tmp_file.close()
 
     tag_list = [t.strip() for t in tags.split() if t.strip()]
 
-    # Run pipeline in a background thread so we don't block the event loop
     loop = asyncio.get_event_loop()
     loop.run_in_executor(
         None,
         _run_pipeline,
-        job_id, tmp_video.name,
-        openai_api_key, anthropic_api_key,
+        job_id, tmp_file.name,
+        openai_api_key.strip(), anthropic_api_key.strip(),
         deck_name, card_type, cards_per_chunk,
         language, claude_model, tag_list,
     )
@@ -92,7 +106,7 @@ async def start_generation(
 
 
 def _run_pipeline(
-    job_id, video_path, openai_key, anthropic_key,
+    job_id, file_path, openai_key, anthropic_key,
     deck_name, card_type, cards_per_chunk, language, claude_model, tags,
 ):
     job = jobs[job_id]
@@ -101,8 +115,8 @@ def _run_pipeline(
         job["messages"].append(msg)
 
     try:
-        apkg_path = generate_cards_from_video(
-            video_path=video_path,
+        apkg_path = generate_cards_from_file(
+            file_path=file_path,
             openai_api_key=openai_key,
             anthropic_api_key=anthropic_key,
             deck_name=deck_name,
@@ -122,7 +136,7 @@ def _run_pipeline(
         job["messages"].append(f"__ERROR__{e}")
     finally:
         try:
-            os.remove(video_path)
+            os.remove(file_path)
         except OSError:
             pass
 
@@ -141,17 +155,14 @@ async def progress_stream(job_id: str):
         while True:
             job = jobs[job_id]
             messages = job["messages"]
-
             while sent < len(messages):
                 msg = messages[sent]
                 sent += 1
                 yield {"data": msg}
                 if msg.startswith("__DONE__") or msg.startswith("__ERROR__"):
                     return
-
             if job["status"] in ("done", "error") and sent >= len(messages):
                 return
-
             await asyncio.sleep(0.5)
 
     return EventSourceResponse(event_generator())
@@ -172,11 +183,9 @@ async def download_apkg(job_id: str):
     if not os.path.exists(apkg_path):
         raise HTTPException(status_code=404, detail="File not found")
 
-    deck_name = "lecture_cards"
-    filename = f"{deck_name.replace(' ', '_')}.apkg"
     return FileResponse(
         path=apkg_path,
-        filename=filename,
+        filename="darwincards_deck.apkg",
         media_type="application/octet-stream",
     )
 

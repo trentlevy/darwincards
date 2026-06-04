@@ -1,5 +1,15 @@
 """
-Core pipeline: MP4 → audio → Whisper transcript → Claude cards → .apkg
+DarwinCards – Core pipeline
+Supports: .mp4/.mov/.mkv (video), .mp3/.m4a/.wav (audio),
+          .txt (transcript), .pdf (slides), .pptx/.ppt (slides)
+
+Route
+-----
+video  → ffmpeg extract audio → Whisper → Claude → .apkg
+audio  → Whisper → Claude → .apkg
+txt    → Claude (no Whisper needed, free!) → .apkg
+pdf    → pdfplumber extract text → Claude → .apkg
+pptx   → python-pptx extract text → Claude → .apkg
 """
 
 import json
@@ -14,14 +24,21 @@ from typing import Callable, List, Dict
 import anthropic
 import genanki
 import openai
+import pdfplumber
+from pptx import Presentation
 
 # ---------------------------------------------------------------------------
 WHISPER_MAX_BYTES = 24 * 1024 * 1024
 WORDS_PER_CHUNK = 1500
 
+VIDEO_EXTS  = {".mp4", ".mov", ".mkv", ".avi", ".m4v", ".webm"}
+AUDIO_EXTS  = {".mp3", ".m4a", ".wav", ".ogg", ".flac"}
+SLIDE_EXTS  = {".pdf", ".pptx", ".ppt"}
+TEXT_EXTS   = {".txt"}
+
 SYSTEM_PROMPT = """\
 You are a medical education expert who creates high-quality Anki flashcards \
-from lecture transcripts. Your cards follow best practices:
+from lecture content. Your cards follow best practices:
 - One concept per card (minimum information principle)
 - Clear, unambiguous questions
 - Answers that are concise but complete
@@ -34,13 +51,12 @@ The JSON should be an array of card objects, each with:
   "back"  : answer / extra context string
 """
 
-# Stable model IDs (arbitrary but must be consistent for deck merging)
 BASIC_MODEL_ID = 1607392319
 CLOZE_MODEL_ID = 1607392320
 
 BASIC_MODEL = genanki.Model(
     BASIC_MODEL_ID,
-    "Lecture to Anki – Basic",
+    "DarwinCards – Basic",
     fields=[{"name": "Front"}, {"name": "Back"}],
     templates=[{
         "name": "Card 1",
@@ -51,7 +67,7 @@ BASIC_MODEL = genanki.Model(
 
 CLOZE_MODEL = genanki.Model(
     CLOZE_MODEL_ID,
-    "Lecture to Anki – Cloze",
+    "DarwinCards – Cloze",
     fields=[{"name": "Text"}, {"name": "Extra"}],
     templates=[{
         "name": "Cloze",
@@ -66,11 +82,11 @@ CLOZE_MODEL = genanki.Model(
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def generate_cards_from_video(
-    video_path: str,
+def generate_cards_from_file(
+    file_path: str,
     openai_api_key: str,
     anthropic_api_key: str,
-    deck_name: str = "Lecture Cards",
+    deck_name: str = "DarwinCards Deck",
     card_type: str = "both",
     cards_per_chunk: int = 8,
     language: str = "en",
@@ -79,42 +95,64 @@ def generate_cards_from_video(
     progress: Callable[[str], None] = lambda _: None,
 ) -> str:
     """
-    Runs the full pipeline and returns the path to a .apkg file.
-    Caller is responsible for deleting the file when done.
+    Auto-detects file type and runs the appropriate pipeline.
+    Returns path to a .apkg file (caller must delete when done).
     """
     tags = tags or []
-    audio_chunks: List[str] = []
-    audio_path = ""
+    ext = Path(file_path).suffix.lower()
 
-    try:
-        progress("Extracting audio from video…")
-        audio_path = _extract_audio(video_path)
+    if ext in VIDEO_EXTS:
+        transcript = _video_to_transcript(file_path, openai_api_key, language, progress)
+    elif ext in AUDIO_EXTS:
+        transcript = _audio_to_transcript(file_path, openai_api_key, language, progress)
+    elif ext in TEXT_EXTS:
+        progress("Reading transcript…")
+        transcript = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+    elif ext == ".pdf":
+        progress("Extracting text from PDF slides…")
+        transcript = _extract_pdf_text(file_path)
+    elif ext in {".pptx", ".ppt"}:
+        progress("Extracting text from PowerPoint slides…")
+        transcript = _extract_pptx_text(file_path)
+    else:
+        raise ValueError(f"Unsupported file type: {ext}")
 
-        progress("Splitting audio into segments…")
-        audio_chunks = _split_audio(audio_path)
+    if not transcript.strip():
+        raise ValueError("No text could be extracted from the file.")
 
-        progress(f"Transcribing {len(audio_chunks)} audio segment(s) with Whisper…")
-        transcript = _transcribe(audio_chunks, openai_api_key, language, progress)
+    progress("Generating Anki cards with Claude…")
+    cards = _generate_cards(
+        transcript, anthropic_api_key, card_type,
+        cards_per_chunk, claude_model, progress,
+    )
 
-        progress("Generating Anki cards with Claude…")
-        cards = _generate_cards(
-            transcript, anthropic_api_key, card_type,
-            cards_per_chunk, claude_model, progress,
-        )
-
-        progress(f"Building .apkg deck with {len(cards)} card(s)…")
-        apkg_path = _build_apkg(cards, deck_name, tags)
-
-    finally:
-        _safe_remove(audio_path)
-        for c in audio_chunks:
-            _safe_remove(c)
-
-    return apkg_path
+    progress(f"Building .apkg deck with {len(cards)} card(s)…")
+    return _build_apkg(cards, deck_name, tags)
 
 
 # ---------------------------------------------------------------------------
-# Step 1 – Extract audio
+# Video → transcript
+# ---------------------------------------------------------------------------
+
+def _video_to_transcript(video_path, api_key, language, progress):
+    progress("Extracting audio from video…")
+    audio_path = _extract_audio(video_path)
+    try:
+        progress("Splitting audio into segments…")
+        chunks = _split_audio(audio_path)
+        return _transcribe(chunks, api_key, language, progress)
+    finally:
+        _safe_remove(audio_path)
+
+
+def _audio_to_transcript(audio_path, api_key, language, progress):
+    progress("Splitting audio into segments…")
+    chunks = _split_audio(audio_path)
+    return _transcribe(chunks, api_key, language, progress)
+
+
+# ---------------------------------------------------------------------------
+# ffmpeg helpers
 # ---------------------------------------------------------------------------
 
 def _extract_audio(video_path: str) -> str:
@@ -123,18 +161,13 @@ def _extract_audio(video_path: str) -> str:
     cmd = [
         "ffmpeg", "-y", "-i", video_path,
         "-vn", "-acodec", "libmp3lame",
-        "-ar", "16000", "-ac", "1", "-b:a", "64k",
-        tmp.name,
+        "-ar", "16000", "-ac", "1", "-b:a", "64k", tmp.name,
     ]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError(f"ffmpeg error:\n{r.stderr[-2000:]}")
     return tmp.name
 
-
-# ---------------------------------------------------------------------------
-# Step 2 – Split audio
-# ---------------------------------------------------------------------------
 
 def _split_audio(audio_path: str) -> List[str]:
     size = os.path.getsize(audio_path)
@@ -163,7 +196,7 @@ def _split_audio(audio_path: str) -> List[str]:
 
 
 # ---------------------------------------------------------------------------
-# Step 3 – Transcribe
+# Whisper transcription
 # ---------------------------------------------------------------------------
 
 def _transcribe(chunks, api_key, language, progress):
@@ -180,7 +213,34 @@ def _transcribe(chunks, api_key, language, progress):
 
 
 # ---------------------------------------------------------------------------
-# Step 4 – Generate cards with Claude
+# Slide text extraction
+# ---------------------------------------------------------------------------
+
+def _extract_pdf_text(pdf_path: str) -> str:
+    pages = []
+    with pdfplumber.open(pdf_path) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text()
+            if text:
+                pages.append(text.strip())
+    return "\n\n".join(pages)
+
+
+def _extract_pptx_text(pptx_path: str) -> str:
+    prs = Presentation(pptx_path)
+    slides = []
+    for slide in prs.slides:
+        texts = []
+        for shape in slide.shapes:
+            if hasattr(shape, "text") and shape.text.strip():
+                texts.append(shape.text.strip())
+        if texts:
+            slides.append("\n".join(texts))
+    return "\n\n---\n\n".join(slides)
+
+
+# ---------------------------------------------------------------------------
+# Claude card generation
 # ---------------------------------------------------------------------------
 
 def _generate_cards(transcript, api_key, card_type, cards_per_chunk, model, progress):
@@ -198,9 +258,9 @@ def _generate_cards(transcript, api_key, card_type, cards_per_chunk, model, prog
         progress(f"Generating cards for section {i}/{len(chunks)}…")
         msg = (
             f"{type_instruction} "
-            f"Generate up to {cards_per_chunk} cards from the following lecture excerpt. "
+            f"Generate up to {cards_per_chunk} cards from the following lecture content. "
             f"Focus on high-yield medical facts, mechanisms, definitions, and clinical pearls.\n\n"
-            f"TRANSCRIPT:\n{chunk}"
+            f"CONTENT:\n{chunk}"
         )
         resp = client.messages.create(
             model=model, max_tokens=4096,
@@ -213,7 +273,7 @@ def _generate_cards(transcript, api_key, card_type, cards_per_chunk, model, prog
 
 
 # ---------------------------------------------------------------------------
-# Step 5 – Build .apkg
+# Build .apkg
 # ---------------------------------------------------------------------------
 
 def _build_apkg(cards: List[Dict], deck_name: str, tags: List[str]) -> str:
@@ -226,19 +286,10 @@ def _build_apkg(cards: List[Dict], deck_name: str, tags: List[str]) -> str:
         back  = card.get("back", "").strip()
         if not front:
             continue
-
         if ctype == "cloze":
-            note = genanki.Note(
-                model=CLOZE_MODEL,
-                fields=[front, back],
-                tags=tags,
-            )
+            note = genanki.Note(model=CLOZE_MODEL, fields=[front, back], tags=tags)
         else:
-            note = genanki.Note(
-                model=BASIC_MODEL,
-                fields=[front, back],
-                tags=tags,
-            )
+            note = genanki.Note(model=BASIC_MODEL, fields=[front, back], tags=tags)
         deck.add_note(note)
 
     tmp = tempfile.NamedTemporaryFile(suffix=".apkg", delete=False)
@@ -273,7 +324,7 @@ def _parse_cards(raw: str) -> List[Dict]:
     if not isinstance(data, list):
         return []
     return [
-        {"type": d.get("type","basic"), "front": str(d.get("front","")), "back": str(d.get("back",""))}
+        {"type": d.get("type", "basic"), "front": str(d.get("front", "")), "back": str(d.get("back", ""))}
         for d in data if isinstance(d, dict) and d.get("front")
     ]
 

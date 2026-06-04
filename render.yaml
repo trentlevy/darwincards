@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: lecture-to-anki
+    name: darwincards
     runtime: docker
     plan: starter
     healthCheckPath: /

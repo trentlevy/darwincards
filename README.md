@@ -1,4 +1,4 @@
-# Lecture to Anki – Web App
+# DarwinCards – Web App
 
 Upload a medical lecture video → get a ready-to-import Anki deck.
 

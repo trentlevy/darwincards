@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lecture to Anki</title>
+  <title>DarwinCards</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -107,6 +107,19 @@
       font-size: .85rem;
     }
     .card-body { padding: 1.25rem; }
+
+    /* ── Format badges ── */
+    .fmt-badge {
+      display: inline-block;
+      padding: .2rem .6rem;
+      border-radius: 999px;
+      font-size: .72rem;
+      font-weight: 500;
+      background: var(--gray-100);
+      color: var(--gray-600);
+      border: 1px solid var(--gray-200);
+    }
+    .fmt-badge.active { background: var(--blue-lt); color: var(--blue); border-color: #bfdbfe; }
 
     /* ── Drop zone ── */
     #drop-zone {
@@ -286,8 +299,8 @@
 
 <header>
   <div class="pill">Med School Study Tool</div>
-  <h1>Lecture to Anki</h1>
-  <p>Upload a lecture video → get a ready-to-import Anki deck in minutes</p>
+  <h1>DarwinCards</h1>
+  <p>Upload a lecture video, audio, transcript, or slides → get a ready-to-import Anki deck in minutes</p>
 </header>
 
 <div class="steps">
@@ -300,17 +313,24 @@
 
   <!-- Video upload -->
   <div class="card">
-    <div class="card-header"><div class="icon">🎬</div> Lecture Video</div>
+    <div class="card-header"><div class="icon">📁</div> Lecture File</div>
     <div class="card-body">
       <div id="drop-zone" onclick="document.getElementById('file-input').click()">
         <div class="dz-icon">📂</div>
-        <div class="dz-title">Drop your lecture video here</div>
-        <div class="dz-sub">or click to browse — MP4, MOV, MKV supported</div>
-        <div id="file-label" style="display:none" class="dz-file">
-          <span>📹</span><span id="file-name"></span>
+        <div class="dz-title">Drop your lecture file here</div>
+        <div class="dz-sub">or click to browse</div>
+        <div style="margin-top:.6rem; display:flex; gap:.4rem; justify-content:center; flex-wrap:wrap;">
+          <span class="fmt-badge video">🎬 Video</span>
+          <span class="fmt-badge audio">🎵 Audio</span>
+          <span class="fmt-badge txt">📄 Transcript</span>
+          <span class="fmt-badge pdf">📑 PDF Slides</span>
+          <span class="fmt-badge pptx">📊 PowerPoint</span>
+        </div>
+        <div id="file-label" style="display:none;margin-top:.8rem" class="dz-file">
+          <span id="file-icon">📹</span><span id="file-name"></span>
         </div>
       </div>
-      <input type="file" id="file-input" accept="video/*,.mp4,.mov,.mkv,.avi,.m4v" />
+      <input type="file" id="file-input" accept=".mp4,.mov,.mkv,.avi,.m4v,.webm,.mp3,.m4a,.wav,.ogg,.txt,.pdf,.pptx,.ppt" />
     </div>
   </div>
 
@@ -318,8 +338,8 @@
   <div class="card">
     <div class="card-header"><div class="icon">🔑</div> API Keys</div>
     <div class="card-body">
-      <div class="form-row">
-        <label>OpenAI API Key <span style="color:var(--red)">*</span></label>
+      <div class="form-row" id="openai-row">
+        <label>OpenAI API Key <span style="color:var(--red)">*</span> <span id="openai-badge" style="font-size:.7rem;font-weight:400;color:var(--gray-400)">(required for video/audio)</span></label>
         <input type="password" id="openai-key" placeholder="sk-..." autocomplete="off" />
         <div class="form-hint">Used for Whisper transcription · <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--blue)">Get one →</a></div>
       </div>
@@ -412,7 +432,7 @@
 </main>
 
 <footer>
-  Powered by OpenAI Whisper + Anthropic Claude · Keys never stored
+  DarwinCards · Powered by OpenAI Whisper + Anthropic Claude · Keys never stored
 </footer>
 
 <script>
@@ -420,6 +440,30 @@
   let currentJobId = null;
   let eventSource = null;
   let logLines = [];
+
+  const VIDEO_EXTS  = new Set(['.mp4','.mov','.mkv','.avi','.m4v','.webm']);
+  const AUDIO_EXTS  = new Set(['.mp3','.m4a','.wav','.ogg']);
+  const TEXT_EXTS   = new Set(['.txt']);
+  const PDF_EXTS    = new Set(['.pdf']);
+  const PPTX_EXTS   = new Set(['.pptx','.ppt']);
+
+  const FILE_META = {
+    video:  { icon: '🎬', label: 'Video selected',      badge: 'video' },
+    audio:  { icon: '🎵', label: 'Audio selected',      badge: 'audio' },
+    txt:    { icon: '📄', label: 'Transcript selected',  badge: 'txt'   },
+    pdf:    { icon: '📑', label: 'PDF slides selected',  badge: 'pdf'   },
+    pptx:   { icon: '📊', label: 'Slides selected',      badge: 'pptx'  },
+  };
+
+  function getFileType(filename) {
+    const ext = '.' + filename.split('.').pop().toLowerCase();
+    if (VIDEO_EXTS.has(ext)) return 'video';
+    if (AUDIO_EXTS.has(ext)) return 'audio';
+    if (TEXT_EXTS.has(ext))  return 'txt';
+    if (PDF_EXTS.has(ext))   return 'pdf';
+    if (PPTX_EXTS.has(ext))  return 'pptx';
+    return 'video';
+  }
 
   // ── File selection ──────────────────────────────────────────────────────
 
@@ -440,10 +484,28 @@
 
   function selectFile(file) {
     selectedFile = file;
-    document.getElementById('file-name').textContent = file.name;
+    const ftype = getFileType(file.name);
+    const meta  = FILE_META[ftype];
+
+    document.getElementById('file-icon').textContent  = meta.icon;
+    document.getElementById('file-name').textContent  = file.name;
     document.getElementById('file-label').style.display = 'inline-flex';
-    document.querySelector('#drop-zone .dz-title').textContent = 'Video selected';
-    document.querySelector('#drop-zone .dz-sub').textContent = `${(file.size / 1024 / 1024).toFixed(1)} MB`;
+    document.querySelector('#drop-zone .dz-title').textContent = meta.label;
+    document.querySelector('#drop-zone .dz-sub').textContent   = `${(file.size / 1024 / 1024).toFixed(1)} MB`;
+
+    // Highlight the matching badge
+    document.querySelectorAll('.fmt-badge').forEach(b => b.classList.remove('active'));
+    const activeBadge = document.querySelector(`.fmt-badge.${meta.badge}`);
+    if (activeBadge) activeBadge.classList.add('active');
+
+    // Show/hide OpenAI key row
+    const needsOpenAI = ftype === 'video' || ftype === 'audio';
+    const openaiRow = document.getElementById('openai-row');
+    openaiRow.style.opacity = needsOpenAI ? '1' : '0.4';
+    openaiRow.querySelector('input').required = needsOpenAI;
+    document.getElementById('openai-badge').textContent = needsOpenAI
+      ? '(required for video/audio)'
+      : '(not needed for this file type ✓)';
   }
 
   // ── Generation ──────────────────────────────────────────────────────────
@@ -452,8 +514,11 @@
     const openaiKey    = document.getElementById('openai-key').value.trim();
     const anthropicKey = document.getElementById('anthropic-key').value.trim();
 
-    if (!selectedFile) { alert('Please select a video file first.'); return; }
-    if (!openaiKey)    { alert('Please enter your OpenAI API key.'); return; }
+    if (!selectedFile) { alert('Please select a file first.'); return; }
+
+    const ftype = getFileType(selectedFile.name);
+    const needsOpenAI = ftype === 'video' || ftype === 'audio';
+    if (needsOpenAI && !openaiKey) { alert('Please enter your OpenAI API key for video/audio files.'); return; }
     if (!anthropicKey) { alert('Please enter your Anthropic API key.'); return; }
 
     document.getElementById('generate-btn').disabled = true;
@@ -462,10 +527,10 @@
     renderLog();
 
     const formData = new FormData();
-    formData.append('video',             selectedFile);
+    formData.append('file',              selectedFile);
     formData.append('openai_api_key',    openaiKey);
     formData.append('anthropic_api_key', anthropicKey);
-    formData.append('deck_name',         document.getElementById('deck-name').value || 'Lecture Cards');
+    formData.append('deck_name',         document.getElementById('deck-name').value || 'DarwinCards Deck');
     formData.append('card_type',         document.getElementById('card-type').value);
     formData.append('cards_per_chunk',   document.getElementById('cards-per-chunk').value);
     formData.append('language',          document.getElementById('language').value || 'en');
@@ -484,13 +549,9 @@
       return;
     }
 
-    // Subscribe to SSE progress
     eventSource = new EventSource(`/api/progress/${jobId}`);
     eventSource.onmessage = e => handleMessage(e.data, jobId);
-    eventSource.onerror   = () => {
-      eventSource.close();
-      // Don't show error if we're already done
-    };
+    eventSource.onerror   = () => { eventSource.close(); };
   }
 
   function handleMessage(msg, jobId) {

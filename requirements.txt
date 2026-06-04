@@ -5,3 +5,5 @@ sse-starlette>=2.1.0
 openai>=1.30.0
 anthropic>=0.28.0
 genanki>=0.13.0
+pdfplumber>=0.11.0
+python-pptx>=0.6.23
