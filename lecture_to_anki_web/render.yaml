@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: darwincards
+    runtime: docker
+    plan: starter
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: 8000
