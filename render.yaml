@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: lecture-to-anki
+    runtime: docker
+    plan: starter
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: 8000

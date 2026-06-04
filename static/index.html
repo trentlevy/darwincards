@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lecture to Anki</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue:    #2563eb;
+      --blue-dk: #1d4ed8;
+      --blue-lt: #eff6ff;
+      --green:   #16a34a;
+      --red:     #dc2626;
+      --gray-50: #f9fafb;
+      --gray-100:#f3f4f6;
+      --gray-200:#e5e7eb;
+      --gray-400:#9ca3af;
+      --gray-600:#4b5563;
+      --gray-800:#1f2937;
+      --radius:  10px;
+      --shadow:  0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -2px rgba(0,0,0,.05);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--gray-50);
+      color: var(--gray-800);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, #1e40af 0%, #2563eb 60%, #3b82f6 100%);
+      color: white;
+      padding: 2.5rem 1.5rem 3rem;
+      text-align: center;
+    }
+    header .pill {
+      display: inline-block;
+      background: rgba(255,255,255,.15);
+      border: 1px solid rgba(255,255,255,.3);
+      border-radius: 999px;
+      padding: .25rem .9rem;
+      font-size: .75rem;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+    }
+    header h1 { font-size: 2.25rem; font-weight: 700; letter-spacing: -.02em; }
+    header p  { margin-top: .6rem; opacity: .85; font-size: 1.05rem; }
+
+    /* ── Steps banner ── */
+    .steps {
+      background: white;
+      border-bottom: 1px solid var(--gray-200);
+      padding: .9rem 1.5rem;
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      font-size: .82rem;
+      color: var(--gray-600);
+    }
+    .steps span { display: flex; align-items: center; gap: .4rem; }
+    .steps .num {
+      background: var(--blue); color: white;
+      border-radius: 50%; width: 1.3rem; height: 1.3rem;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .7rem; font-weight: 700; flex-shrink: 0;
+    }
+
+    /* ── Layout ── */
+    main {
+      max-width: 680px;
+      margin: 2.5rem auto;
+      padding: 0 1rem 4rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: white;
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .card-header {
+      padding: .9rem 1.25rem;
+      border-bottom: 1px solid var(--gray-100);
+      font-weight: 600;
+      font-size: .9rem;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      color: var(--gray-800);
+    }
+    .card-header .icon {
+      width: 1.6rem; height: 1.6rem;
+      background: var(--blue-lt);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .85rem;
+    }
+    .card-body { padding: 1.25rem; }
+
+    /* ── Drop zone ── */
+    #drop-zone {
+      border: 2px dashed var(--gray-200);
+      border-radius: var(--radius);
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+    #drop-zone:hover, #drop-zone.drag-over {
+      border-color: var(--blue);
+      background: var(--blue-lt);
+    }
+    #drop-zone .dz-icon { font-size: 2.5rem; margin-bottom: .6rem; }
+    #drop-zone .dz-title { font-weight: 600; color: var(--gray-800); }
+    #drop-zone .dz-sub   { font-size: .82rem; color: var(--gray-400); margin-top: .3rem; }
+    #drop-zone .dz-file  {
+      margin-top: .8rem;
+      background: var(--blue-lt);
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      padding: .4rem .8rem;
+      font-size: .82rem;
+      color: var(--blue);
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+    }
+    #file-input { display: none; }
+
+    /* ── Form elements ── */
+    .form-row { display: flex; flex-direction: column; gap: .35rem; margin-bottom: 1rem; }
+    .form-row:last-child { margin-bottom: 0; }
+    .form-row label { font-size: .8rem; font-weight: 600; color: var(--gray-600); }
+    .form-row input, .form-row select {
+      width: 100%;
+      padding: .55rem .75rem;
+      border: 1px solid var(--gray-200);
+      border-radius: 7px;
+      font-size: .88rem;
+      color: var(--gray-800);
+      background: white;
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .form-row input:focus, .form-row select:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+    }
+    .form-hint { font-size: .73rem; color: var(--gray-400); margin-top: .2rem; }
+
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+    /* ── Collapsible ── */
+    details summary {
+      cursor: pointer;
+      font-size: .82rem;
+      color: var(--blue);
+      user-select: none;
+      padding: .5rem 0 0;
+    }
+    details[open] summary { margin-bottom: .8rem; }
+
+    /* ── Button ── */
+    #generate-btn {
+      width: 100%;
+      padding: .85rem;
+      background: var(--blue);
+      color: white;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s, transform .1s, box-shadow .2s;
+      box-shadow: 0 1px 3px rgba(37,99,235,.4);
+    }
+    #generate-btn:hover:not(:disabled) {
+      background: var(--blue-dk);
+      box-shadow: 0 4px 12px rgba(37,99,235,.35);
+    }
+    #generate-btn:active:not(:disabled) { transform: scale(.99); }
+    #generate-btn:disabled { opacity: .55; cursor: not-allowed; }
+
+    /* ── Progress ── */
+    #progress-card { display: none; }
+    .progress-log {
+      font-size: .82rem;
+      color: var(--gray-600);
+      line-height: 1.7;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+    .progress-log .log-line { display: flex; gap: .5rem; align-items: flex-start; }
+    .progress-log .log-line.active { color: var(--blue); font-weight: 500; }
+    .progress-log .log-line.done   { color: var(--green); }
+    .progress-log .log-line .dot   { margin-top: .3rem; flex-shrink: 0; }
+    .spinner {
+      width: 1rem; height: 1rem;
+      border: 2px solid var(--gray-200);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Download ── */
+    #download-card { display: none; }
+    .success-banner {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 8px;
+      padding: 1.25rem;
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    .success-banner .check { font-size: 2rem; margin-bottom: .4rem; }
+    .success-banner h3 { color: var(--green); font-size: 1rem; }
+    .success-banner p  { font-size: .82rem; color: var(--gray-600); margin-top: .3rem; }
+    #card-count { font-weight: 700; }
+
+    #download-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: .5rem;
+      width: 100%;
+      padding: .8rem;
+      background: var(--green);
+      color: white;
+      border: none;
+      border-radius: var(--radius);
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background .2s;
+    }
+    #download-btn:hover { background: #15803d; }
+
+    #restart-btn {
+      margin-top: .6rem;
+      width: 100%;
+      padding: .65rem;
+      background: white;
+      color: var(--gray-600);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius);
+      font-size: .85rem;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    #restart-btn:hover { background: var(--gray-100); }
+
+    /* ── Error ── */
+    .error-banner {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      padding: 1rem;
+      color: var(--red);
+      font-size: .85rem;
+    }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      font-size: .75rem;
+      color: var(--gray-400);
+      padding: 2rem 1rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="pill">Med School Study Tool</div>
+  <h1>Lecture to Anki</h1>
+  <p>Upload a lecture video → get a ready-to-import Anki deck in minutes</p>
+</header>
+
+<div class="steps">
+  <span><span class="num">1</span> Upload your lecture</span>
+  <span><span class="num">2</span> We transcribe + generate cards</span>
+  <span><span class="num">3</span> Download &amp; import to Anki</span>
+</div>
+
+<main>
+
+  <!-- Video upload -->
+  <div class="card">
+    <div class="card-header"><div class="icon">🎬</div> Lecture Video</div>
+    <div class="card-body">
+      <div id="drop-zone" onclick="document.getElementById('file-input').click()">
+        <div class="dz-icon">📂</div>
+        <div class="dz-title">Drop your lecture video here</div>
+        <div class="dz-sub">or click to browse — MP4, MOV, MKV supported</div>
+        <div id="file-label" style="display:none" class="dz-file">
+          <span>📹</span><span id="file-name"></span>
+        </div>
+      </div>
+      <input type="file" id="file-input" accept="video/*,.mp4,.mov,.mkv,.avi,.m4v" />
+    </div>
+  </div>
+
+  <!-- API Keys -->
+  <div class="card">
+    <div class="card-header"><div class="icon">🔑</div> API Keys</div>
+    <div class="card-body">
+      <div class="form-row">
+        <label>OpenAI API Key <span style="color:var(--red)">*</span></label>
+        <input type="password" id="openai-key" placeholder="sk-..." autocomplete="off" />
+        <div class="form-hint">Used for Whisper transcription · <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--blue)">Get one →</a></div>
+      </div>
+      <div class="form-row">
+        <label>Anthropic API Key <span style="color:var(--red)">*</span></label>
+        <input type="password" id="anthropic-key" placeholder="sk-ant-..." autocomplete="off" />
+        <div class="form-hint">Used for Claude card generation · <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--blue)">Get one →</a></div>
+      </div>
+      <div class="form-hint" style="margin-top:.25rem">Keys are sent directly to the APIs and never stored on our servers.</div>
+    </div>
+  </div>
+
+  <!-- Options -->
+  <div class="card">
+    <div class="card-header"><div class="icon">⚙️</div> Options</div>
+    <div class="card-body">
+      <div class="form-row">
+        <label>Deck Name</label>
+        <input type="text" id="deck-name" value="Lecture Cards" placeholder="e.g. Cardiology Week 3" />
+      </div>
+      <div class="two-col">
+        <div class="form-row">
+          <label>Card Types</label>
+          <select id="card-type">
+            <option value="both">Basic + Cloze (recommended)</option>
+            <option value="basic">Basic only (Q&A)</option>
+            <option value="cloze">Cloze only</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Cards per Section</label>
+          <select id="cards-per-chunk">
+            <option value="5">5 (concise)</option>
+            <option value="8" selected>8 (recommended)</option>
+            <option value="12">12 (comprehensive)</option>
+            <option value="20">20 (exhaustive)</option>
+          </select>
+        </div>
+      </div>
+      <details>
+        <summary>Advanced options</summary>
+        <div class="two-col">
+          <div class="form-row">
+            <label>Lecture Language</label>
+            <input type="text" id="language" value="en" maxlength="5" style="max-width:80px" />
+          </div>
+          <div class="form-row">
+            <label>Claude Model</label>
+            <select id="claude-model">
+              <option value="claude-opus-4-6">claude-opus-4-6 (best)</option>
+              <option value="claude-sonnet-4-6">claude-sonnet-4-6 (fast)</option>
+              <option value="claude-haiku-4-5-20251001">claude-haiku (fastest)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Tags (space-separated)</label>
+          <input type="text" id="tags" placeholder="e.g. cardiology step1 week3" />
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <!-- Generate button -->
+  <button id="generate-btn" onclick="startGeneration()">Generate Anki Cards →</button>
+
+  <!-- Progress -->
+  <div class="card" id="progress-card">
+    <div class="card-header"><div class="icon">⏳</div> Processing…</div>
+    <div class="card-body">
+      <div class="progress-log" id="progress-log"></div>
+    </div>
+  </div>
+
+  <!-- Download -->
+  <div class="card" id="download-card">
+    <div class="card-body">
+      <div class="success-banner">
+        <div class="check">🎉</div>
+        <h3>Your deck is ready!</h3>
+        <p>Generated <span id="card-count">—</span> cards — double-click the .apkg file to import into Anki</p>
+      </div>
+      <a id="download-btn" href="#" download>
+        ⬇️ Download .apkg Deck
+      </a>
+      <button id="restart-btn" onclick="restart()">Generate another deck</button>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  Powered by OpenAI Whisper + Anthropic Claude · Keys never stored
+</footer>
+
+<script>
+  let selectedFile = null;
+  let currentJobId = null;
+  let eventSource = null;
+  let logLines = [];
+
+  // ── File selection ──────────────────────────────────────────────────────
+
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+
+  fileInput.addEventListener('change', e => {
+    if (e.target.files[0]) selectFile(e.target.files[0]);
+  });
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) selectFile(e.dataTransfer.files[0]);
+  });
+
+  function selectFile(file) {
+    selectedFile = file;
+    document.getElementById('file-name').textContent = file.name;
+    document.getElementById('file-label').style.display = 'inline-flex';
+    document.querySelector('#drop-zone .dz-title').textContent = 'Video selected';
+    document.querySelector('#drop-zone .dz-sub').textContent = `${(file.size / 1024 / 1024).toFixed(1)} MB`;
+  }
+
+  // ── Generation ──────────────────────────────────────────────────────────
+
+  async function startGeneration() {
+    const openaiKey    = document.getElementById('openai-key').value.trim();
+    const anthropicKey = document.getElementById('anthropic-key').value.trim();
+
+    if (!selectedFile) { alert('Please select a video file first.'); return; }
+    if (!openaiKey)    { alert('Please enter your OpenAI API key.'); return; }
+    if (!anthropicKey) { alert('Please enter your Anthropic API key.'); return; }
+
+    document.getElementById('generate-btn').disabled = true;
+    showCard('progress-card');
+    logLines = [];
+    renderLog();
+
+    const formData = new FormData();
+    formData.append('video',             selectedFile);
+    formData.append('openai_api_key',    openaiKey);
+    formData.append('anthropic_api_key', anthropicKey);
+    formData.append('deck_name',         document.getElementById('deck-name').value || 'Lecture Cards');
+    formData.append('card_type',         document.getElementById('card-type').value);
+    formData.append('cards_per_chunk',   document.getElementById('cards-per-chunk').value);
+    formData.append('language',          document.getElementById('language').value || 'en');
+    formData.append('claude_model',      document.getElementById('claude-model').value);
+    formData.append('tags',              document.getElementById('tags').value);
+
+    let jobId;
+    try {
+      const res = await fetch('/api/generate', { method: 'POST', body: formData });
+      if (!res.ok) { const t = await res.text(); throw new Error(t); }
+      const data = await res.json();
+      jobId = data.job_id;
+      currentJobId = jobId;
+    } catch (err) {
+      showError(`Upload failed: ${err.message}`);
+      return;
+    }
+
+    // Subscribe to SSE progress
+    eventSource = new EventSource(`/api/progress/${jobId}`);
+    eventSource.onmessage = e => handleMessage(e.data, jobId);
+    eventSource.onerror   = () => {
+      eventSource.close();
+      // Don't show error if we're already done
+    };
+  }
+
+  function handleMessage(msg, jobId) {
+    if (msg.startsWith('__DONE__')) {
+      eventSource && eventSource.close();
+      markLastDone();
+      showDownload(jobId);
+    } else if (msg.startsWith('__ERROR__')) {
+      eventSource && eventSource.close();
+      const err = msg.replace('__ERROR__', '');
+      showError(err);
+    } else {
+      addLogLine(msg);
+    }
+  }
+
+  // ── Log rendering ───────────────────────────────────────────────────────
+
+  function addLogLine(msg) {
+    if (logLines.length > 0) logLines[logLines.length - 1].done = true;
+    logLines.push({ text: msg, done: false });
+    renderLog();
+  }
+
+  function markLastDone() {
+    if (logLines.length > 0) logLines[logLines.length - 1].done = true;
+    renderLog();
+  }
+
+  function renderLog() {
+    const el = document.getElementById('progress-log');
+    el.innerHTML = logLines.map(l => {
+      if (l.done) {
+        return `<div class="log-line done"><span class="dot">✓</span><span>${l.text}</span></div>`;
+      } else {
+        return `<div class="log-line active"><span class="spinner"></span><span>${l.text}</span></div>`;
+      }
+    }).join('');
+    el.scrollTop = el.scrollHeight;
+  }
+
+  // ── Download ────────────────────────────────────────────────────────────
+
+  async function showDownload(jobId) {
+    // Estimate card count from log messages (look for "X card(s)")
+    const countMsg = logLines.find(l => l.text.includes('card'));
+    const match = countMsg ? countMsg.text.match(/(\d+)\s+card/) : null;
+    document.getElementById('card-count').textContent = match ? match[1] : 'your';
+
+    document.getElementById('download-btn').href = `/api/download/${jobId}`;
+    hideCard('progress-card');
+    showCard('download-card');
+    document.getElementById('generate-btn').disabled = false;
+  }
+
+  function showError(msg) {
+    const log = document.getElementById('progress-log');
+    log.innerHTML += `<div class="error-banner" style="margin-top:.75rem">❌ ${msg}</div>`;
+    document.getElementById('generate-btn').disabled = false;
+  }
+
+  function restart() {
+    hideCard('download-card');
+    hideCard('progress-card');
+    document.getElementById('generate-btn').disabled = false;
+    logLines = [];
+  }
+
+  function showCard(id) { document.getElementById(id).style.display = 'block'; }
+  function hideCard(id) { document.getElementById(id).style.display = 'none'; }
+</script>
+</body>
+</html>
