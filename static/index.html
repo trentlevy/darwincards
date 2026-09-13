@@ -8,620 +8,828 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --blue:    #2563eb;
-      --blue-dk: #1d4ed8;
-      --blue-lt: #eff6ff;
-      --green:   #16a34a;
-      --red:     #dc2626;
-      --gray-50: #f9fafb;
-      --gray-100:#f3f4f6;
-      --gray-200:#e5e7eb;
-      --gray-400:#9ca3af;
-      --gray-600:#4b5563;
-      --gray-800:#1f2937;
-      --radius:  10px;
-      --shadow:  0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
-      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -2px rgba(0,0,0,.05);
+      --bg: #0a0a12;
+      --surface: rgba(255,255,255,.04);
+      --border: rgba(255,255,255,.08);
+      --text: #e8e8f0;
+      --text-muted: rgba(232,232,240,.45);
+      --radius: 12px;
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--gray-50);
-      color: var(--gray-800);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
     }
 
-    /* ── Header ── */
-    header {
-      background: linear-gradient(135deg, #1e40af 0%, #2563eb 60%, #3b82f6 100%);
-      color: white;
-      padding: 2.5rem 1.5rem 3rem;
-      text-align: center;
-    }
-    header .pill {
-      display: inline-block;
-      background: rgba(255,255,255,.15);
-      border: 1px solid rgba(255,255,255,.3);
-      border-radius: 999px;
-      padding: .25rem .9rem;
-      font-size: .75rem;
-      letter-spacing: .05em;
-      text-transform: uppercase;
-      margin-bottom: 1rem;
-    }
-    header h1 { font-size: 2.25rem; font-weight: 700; letter-spacing: -.02em; }
-    header p  { margin-top: .6rem; opacity: .85; font-size: 1.05rem; }
-
-    /* ── Steps banner ── */
-    .steps {
-      background: white;
-      border-bottom: 1px solid var(--gray-200);
-      padding: .9rem 1.5rem;
+    /* ── Top bar ── */
+    .topbar {
       display: flex;
-      justify-content: center;
-      gap: 2rem;
-      font-size: .82rem;
-      color: var(--gray-600);
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.1rem 2rem;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      z-index: 10;
     }
-    .steps span { display: flex; align-items: center; gap: .4rem; }
-    .steps .num {
-      background: var(--blue); color: white;
-      border-radius: 50%; width: 1.3rem; height: 1.3rem;
-      display: flex; align-items: center; justify-content: center;
-      font-size: .7rem; font-weight: 700; flex-shrink: 0;
+    .logo {
+      font-size: 1.1rem;
+      font-weight: 800;
+      letter-spacing: -.02em;
+      background: linear-gradient(90deg, #a78bfa, #60a5fa, #34d399, #f59e0b, #f472b6);
+      background-size: 300%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: logohue 6s linear infinite;
     }
+    @keyframes logohue { to { background-position: 300% 0; } }
+    .topbar-right { display: flex; align-items: center; gap: .75rem; }
 
-    /* ── Layout ── */
-    main {
-      max-width: 680px;
-      margin: 2.5rem auto;
-      padding: 0 1rem 4rem;
+    /* auth buttons (logged out) */
+    .tb-btn {
+      padding: .38rem 1rem;
+      border-radius: 6px;
+      font-size: .8rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity .15s;
+    }
+    .tb-btn:hover { opacity: .8; }
+    .tb-btn.ghost  { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    .tb-btn.filled { background: white; color: #0a0a12; }
+
+    /* user info (logged in) */
+    .tb-user { font-size: .78rem; color: var(--text-muted); }
+    .tb-plan { padding: .2rem .6rem; border-radius: 999px; font-size: .68rem; font-weight: 700; margin-left: .4rem; }
+    .tb-plan.free { background: rgba(245,158,11,.15); color: #f59e0b; }
+    .tb-plan.pro  { background: rgba(52,211,153,.15); color: #34d399; }
+    .tb-signout { background: none; border: none; color: var(--text-muted); font-size: .75rem; cursor: pointer; text-decoration: underline; }
+    .tb-upgrade { background: linear-gradient(135deg, #7c3aed, #2563eb); color: white; border: none; border-radius: 6px; padding: .3rem .85rem; font-size: .75rem; font-weight: 700; cursor: pointer; }
+
+    /* ── Hero ── */
+    .hero {
       display: flex;
       flex-direction: column;
-      gap: 1.25rem;
+      align-items: center;
+      padding: 3rem 1rem 2rem;
+    }
+    .hero-title {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -.03em;
+      text-align: center;
+      margin-bottom: .5rem;
+    }
+    .hero-sub {
+      font-size: .9rem;
+      color: var(--text-muted);
+      text-align: center;
+      margin-bottom: 2.5rem;
     }
 
-    /* ── Cards ── */
-    .card {
-      background: white;
-      border: 1px solid var(--gray-200);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
+    /* ── Plasma Orb ── */
+    .orb-wrap {
+      position: relative;
+      width: 300px;
+      height: 300px;
+      margin-bottom: 2rem;
+      cursor: pointer;
+    }
+
+    /* Glow layers behind orb */
+    .orb-glow {
+      position: absolute;
+      inset: -40px;
+      border-radius: 50%;
+      filter: blur(50px);
+      opacity: .35;
+      animation: glowshift 8s ease-in-out infinite;
+      background: conic-gradient(from 0deg, #7c3aed, #2563eb, #059669, #d97706, #dc2626, #7c3aed);
+      z-index: 0;
+    }
+    @keyframes glowshift {
+      0%,100% { transform: scale(1) rotate(0deg); opacity: .35; }
+      50%      { transform: scale(1.15) rotate(180deg); opacity: .5; }
+    }
+
+    /* SVG plasma orb */
+    .orb-svg {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
       overflow: hidden;
     }
-    .card-header {
-      padding: .9rem 1.25rem;
-      border-bottom: 1px solid var(--gray-100);
-      font-weight: 600;
-      font-size: .9rem;
+    .orb-svg svg { width: 100%; height: 100%; }
+
+    /* Blob morphing shape clipping the plasma */
+    .blob {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      border-radius: 50%;
+      background: transparent;
+      box-shadow: inset 0 0 60px 20px var(--bg);
+      pointer-events: none;
+    }
+
+    /* Drag-over state */
+    .orb-wrap.drag-over .orb-glow { opacity: .75; transform: scale(1.1); }
+    .orb-wrap.drag-over .orb-svg  { filter: brightness(1.3) saturate(1.5); }
+
+    /* Processing state */
+    .orb-wrap.processing .orb-glow {
+      animation: glowshift 2s ease-in-out infinite;
+    }
+
+    /* Done state — green pulse */
+    .orb-wrap.done .orb-glow {
+      background: radial-gradient(circle, #34d399, #059669);
+      animation: donepulse 1.5s ease-in-out infinite;
+    }
+    @keyframes donepulse {
+      0%,100% { opacity: .4; transform: scale(1); }
+      50%      { opacity: .7; transform: scale(1.2); }
+    }
+
+    /* ── Orb label ── */
+    .orb-label {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: .5rem;
-      color: var(--gray-800);
-    }
-    .card-header .icon {
-      width: 1.6rem; height: 1.6rem;
-      background: var(--blue-lt);
-      border-radius: 6px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: .85rem;
-    }
-    .card-body { padding: 1.25rem; }
-
-    /* ── Format badges ── */
-    .fmt-badge {
-      display: inline-block;
-      padding: .2rem .6rem;
-      border-radius: 999px;
-      font-size: .72rem;
-      font-weight: 500;
-      background: var(--gray-100);
-      color: var(--gray-600);
-      border: 1px solid var(--gray-200);
-    }
-    .fmt-badge.active { background: var(--blue-lt); color: var(--blue); border-color: #bfdbfe; }
-
-    /* ── Drop zone ── */
-    #drop-zone {
-      border: 2px dashed var(--gray-200);
-      border-radius: var(--radius);
-      padding: 2.5rem 1.5rem;
+      justify-content: center;
+      pointer-events: none;
       text-align: center;
-      cursor: pointer;
-      transition: border-color .2s, background .2s;
+      padding: 1.5rem;
     }
-    #drop-zone:hover, #drop-zone.drag-over {
-      border-color: var(--blue);
-      background: var(--blue-lt);
+    .orb-icon { font-size: 2.5rem; margin-bottom: .5rem; }
+    .orb-title {
+      font-size: .95rem;
+      font-weight: 700;
+      color: rgba(255,255,255,.9);
+      text-shadow: 0 1px 8px rgba(0,0,0,.6);
     }
-    #drop-zone .dz-icon { font-size: 2.5rem; margin-bottom: .6rem; }
-    #drop-zone .dz-title { font-weight: 600; color: var(--gray-800); }
-    #drop-zone .dz-sub   { font-size: .82rem; color: var(--gray-400); margin-top: .3rem; }
-    #drop-zone .dz-file  {
-      margin-top: .8rem;
-      background: var(--blue-lt);
-      border: 1px solid #bfdbfe;
-      border-radius: 6px;
-      padding: .4rem .8rem;
-      font-size: .82rem;
-      color: var(--blue);
-      display: inline-flex;
-      align-items: center;
-      gap: .4rem;
+    .orb-sub {
+      font-size: .72rem;
+      color: rgba(255,255,255,.55);
+      margin-top: .25rem;
+      text-shadow: 0 1px 4px rgba(0,0,0,.5);
+    }
+    #orb-file-name {
+      font-size: .78rem;
+      color: rgba(255,255,255,.85);
+      margin-top: .4rem;
+      font-weight: 600;
+      text-shadow: 0 1px 6px rgba(0,0,0,.6);
+      word-break: break-all;
+      max-width: 180px;
     }
     #file-input { display: none; }
 
-    /* ── Form elements ── */
-    .form-row { display: flex; flex-direction: column; gap: .35rem; margin-bottom: 1rem; }
-    .form-row:last-child { margin-bottom: 0; }
-    .form-row label { font-size: .8rem; font-weight: 600; color: var(--gray-600); }
-    .form-row input, .form-row select {
-      width: 100%;
-      padding: .55rem .75rem;
-      border: 1px solid var(--gray-200);
-      border-radius: 7px;
-      font-size: .88rem;
-      color: var(--gray-800);
-      background: white;
-      outline: none;
-      transition: border-color .2s, box-shadow .2s;
+    /* Format pills */
+    .fmt-pills {
+      display: flex;
+      gap: .4rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 2rem;
     }
-    .form-row input:focus, .form-row select:focus {
-      border-color: var(--blue);
-      box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+    .fmt-pill {
+      padding: .22rem .7rem;
+      border-radius: 999px;
+      font-size: .7rem;
+      font-weight: 600;
+      background: var(--surface);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      transition: all .2s;
     }
-    .form-hint { font-size: .73rem; color: var(--gray-400); margin-top: .2rem; }
-
-    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-
-    /* ── Collapsible ── */
-    details summary {
-      cursor: pointer;
-      font-size: .82rem;
-      color: var(--blue);
-      user-select: none;
-      padding: .5rem 0 0;
+    .fmt-pill.active {
+      background: rgba(139,92,246,.2);
+      color: #c4b5fd;
+      border-color: rgba(139,92,246,.4);
     }
-    details[open] summary { margin-bottom: .8rem; }
 
-    /* ── Button ── */
+    /* ── Generate button ── */
     #generate-btn {
-      width: 100%;
-      padding: .85rem;
-      background: var(--blue);
+      padding: .85rem 2.5rem;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #7c3aed, #2563eb, #059669);
+      background-size: 200%;
+      animation: btnhue 4s linear infinite;
       color: white;
       border: none;
-      border-radius: var(--radius);
       font-size: 1rem;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
-      transition: background .2s, transform .1s, box-shadow .2s;
-      box-shadow: 0 1px 3px rgba(37,99,235,.4);
+      box-shadow: 0 4px 24px rgba(124,58,237,.4);
+      transition: transform .15s, box-shadow .15s;
+      margin-bottom: 2.5rem;
     }
     #generate-btn:hover:not(:disabled) {
-      background: var(--blue-dk);
-      box-shadow: 0 4px 12px rgba(37,99,235,.35);
+      transform: scale(1.04);
+      box-shadow: 0 6px 32px rgba(124,58,237,.6);
     }
-    #generate-btn:active:not(:disabled) { transform: scale(.99); }
-    #generate-btn:disabled { opacity: .55; cursor: not-allowed; }
+    #generate-btn:disabled { opacity: .4; cursor: not-allowed; animation: none; background: #444; }
+    @keyframes btnhue { to { background-position: 200% 0; } }
+
+    /* ── Main content area ── */
+    .content { max-width: 600px; margin: 0 auto; padding: 0 1rem 5rem; }
+
+    /* ── Glass cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      backdrop-filter: blur(12px);
+      margin-bottom: 1rem;
+    }
+    .card-header {
+      padding: .85rem 1.2rem;
+      border-bottom: 1px solid var(--border);
+      font-size: .83rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .07em;
+    }
+    .card-body { padding: 1.2rem; }
+
+    /* ── Auth ── */
+    #auth-modal {
+      display: none;
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(0,0,0,.7);
+      backdrop-filter: blur(8px);
+      align-items: center;
+      justify-content: center;
+    }
+    #auth-modal.open { display: flex; }
+    .auth-box {
+      background: #131320;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: 100%; max-width: 380px;
+      margin: 1rem;
+      overflow: hidden;
+    }
+    .auth-tabs { display: flex; border-bottom: 1px solid var(--border); }
+    .auth-tab {
+      flex: 1; padding: .85rem;
+      text-align: center;
+      font-size: .85rem; font-weight: 600;
+      cursor: pointer;
+      color: var(--text-muted);
+      border-bottom: 2px solid transparent;
+      transition: all .15s;
+    }
+    .auth-tab.active { color: #a78bfa; border-bottom-color: #a78bfa; }
+    .auth-body { padding: 1.5rem; }
+    .auth-close {
+      position: absolute; top: 1rem; right: 1rem;
+      background: none; border: none; color: var(--text-muted);
+      font-size: 1.3rem; cursor: pointer; line-height: 1;
+    }
+    .auth-box { position: relative; }
+
+    /* ── Forms ── */
+    .form-row { display: flex; flex-direction: column; gap: .3rem; margin-bottom: .85rem; }
+    .form-row:last-child { margin-bottom: 0; }
+    .form-row label { font-size: .72rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
+    .form-row input, .form-row select {
+      width: 100%; padding: .55rem .8rem;
+      border: 1px solid var(--border); border-radius: 7px;
+      font-size: .88rem; color: var(--text); background: rgba(255,255,255,.05);
+      outline: none; transition: border-color .2s, box-shadow .2s;
+    }
+    .form-row input:focus, .form-row select:focus {
+      border-color: #7c3aed;
+      box-shadow: 0 0 0 3px rgba(124,58,237,.2);
+    }
+    .form-row select option { background: #131320; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: .85rem; }
+    details summary { cursor: pointer; font-size: .78rem; color: #a78bfa; user-select: none; padding: .35rem 0 0; }
+    details[open] summary { margin-bottom: .8rem; }
+    hr.divider { border: none; border-top: 1px solid var(--border); margin: .85rem 0; }
+
+    /* ── Auth submit ── */
+    .btn-auth {
+      width: 100%; padding: .8rem;
+      background: linear-gradient(135deg, #7c3aed, #2563eb);
+      color: white; border: none; border-radius: 8px;
+      font-size: .95rem; font-weight: 700;
+      cursor: pointer; margin-top: .75rem;
+    }
+    .btn-auth:disabled { opacity: .5; cursor: not-allowed; }
 
     /* ── Progress ── */
-    #progress-card { display: none; }
-    .progress-log {
-      font-size: .82rem;
-      color: var(--gray-600);
-      line-height: 1.7;
-      max-height: 180px;
-      overflow-y: auto;
-    }
-    .progress-log .log-line { display: flex; gap: .5rem; align-items: flex-start; }
-    .progress-log .log-line.active { color: var(--blue); font-weight: 500; }
-    .progress-log .log-line.done   { color: var(--green); }
-    .progress-log .log-line .dot   { margin-top: .3rem; flex-shrink: 0; }
+    #progress-section { display: none; margin-bottom: 1rem; }
+    .progress-log { font-size: .8rem; color: var(--text-muted); line-height: 1.85; max-height: 180px; overflow-y: auto; }
+    .log-line { display: flex; gap: .5rem; align-items: flex-start; }
+    .log-line.active { color: #a78bfa; }
+    .log-line.done   { color: #34d399; }
     .spinner {
-      width: 1rem; height: 1rem;
-      border: 2px solid var(--gray-200);
-      border-top-color: var(--blue);
+      width: .8rem; height: .8rem;
+      border: 2px solid var(--border);
+      border-top-color: #a78bfa;
       border-radius: 50%;
       animation: spin .7s linear infinite;
-      flex-shrink: 0;
+      flex-shrink: 0; margin-top: .28rem;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Download ── */
-    #download-card { display: none; }
-    .success-banner {
-      background: #f0fdf4;
-      border: 1px solid #bbf7d0;
-      border-radius: 8px;
-      padding: 1.25rem;
-      text-align: center;
-      margin-bottom: 1rem;
-    }
-    .success-banner .check { font-size: 2rem; margin-bottom: .4rem; }
-    .success-banner h3 { color: var(--green); font-size: 1rem; }
-    .success-banner p  { font-size: .82rem; color: var(--gray-600); margin-top: .3rem; }
-    #card-count { font-weight: 700; }
+    /* ── Result cards ── */
+    #download-section { display: none; margin-bottom: 1rem; }
+    #upgrade-section  { display: none; margin-bottom: 1rem; }
 
-    #download-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: .5rem;
-      width: 100%;
-      padding: .8rem;
-      background: var(--green);
-      color: white;
-      border: none;
+    .result-banner {
       border-radius: var(--radius);
-      font-size: .95rem;
-      font-weight: 600;
-      cursor: pointer;
-      text-decoration: none;
-      transition: background .2s;
-    }
-    #download-btn:hover { background: #15803d; }
-
-    #restart-btn {
-      margin-top: .6rem;
-      width: 100%;
-      padding: .65rem;
-      background: white;
-      color: var(--gray-600);
-      border: 1px solid var(--gray-200);
-      border-radius: var(--radius);
-      font-size: .85rem;
-      cursor: pointer;
-      transition: background .2s;
-    }
-    #restart-btn:hover { background: var(--gray-100); }
-
-    /* ── Error ── */
-    .error-banner {
-      background: #fef2f2;
-      border: 1px solid #fecaca;
-      border-radius: 8px;
-      padding: 1rem;
-      color: var(--red);
-      font-size: .85rem;
-    }
-
-    /* ── Footer ── */
-    footer {
+      padding: 1.2rem;
       text-align: center;
-      font-size: .75rem;
-      color: var(--gray-400);
-      padding: 2rem 1rem;
+      margin-bottom: .9rem;
     }
+    .result-banner.success { background: rgba(52,211,153,.1); border: 1px solid rgba(52,211,153,.25); }
+    .result-banner.warning { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.25); }
+    .result-banner .icon { font-size: 2rem; margin-bottom: .4rem; }
+    .result-banner h3 { font-size: 1rem; font-weight: 700; }
+    .result-banner.success h3 { color: #34d399; }
+    .result-banner.warning h3 { color: #f59e0b; }
+    .result-banner p  { font-size: .78rem; color: var(--text-muted); margin-top: .25rem; }
+
+    .btn-download {
+      display: flex; align-items: center; justify-content: center; gap: .5rem;
+      width: 100%; padding: .8rem;
+      background: linear-gradient(135deg, #059669, #0891b2);
+      color: white; border: none; border-radius: 8px;
+      font-size: .9rem; font-weight: 700;
+      cursor: pointer; text-decoration: none;
+    }
+    .btn-upgrade {
+      width: 100%; padding: .8rem;
+      background: linear-gradient(135deg, #d97706, #dc2626);
+      color: white; border: none; border-radius: 8px;
+      font-size: .9rem; font-weight: 700; cursor: pointer;
+    }
+    .btn-ghost {
+      width: 100%; padding: .65rem;
+      background: transparent; color: var(--text-muted);
+      border: 1px solid var(--border); border-radius: 8px;
+      font-size: .82rem; cursor: pointer; margin-top: .6rem;
+    }
+    .btn-ghost:hover { background: var(--surface); }
+
+    .error-inline {
+      background: rgba(220,38,38,.1); border: 1px solid rgba(220,38,38,.25);
+      border-radius: 7px; padding: .75rem; color: #f87171;
+      font-size: .78rem; margin-top: .6rem;
+    }
+    #auth-error { display: none; margin-bottom: .75rem; }
   </style>
 </head>
 <body>
 
-<header>
-  <div class="pill">Med School Study Tool</div>
-  <h1>DarwinCards</h1>
-  <p>Upload a lecture video, audio, transcript, or slides → get a ready-to-import Anki deck in minutes</p>
-</header>
-
-<div class="steps">
-  <span><span class="num">1</span> Upload your lecture</span>
-  <span><span class="num">2</span> We transcribe + generate cards</span>
-  <span><span class="num">3</span> Download &amp; import to Anki</span>
+<!-- Auth modal (overlay) -->
+<div id="auth-modal">
+  <div class="auth-box">
+    <button class="auth-close" onclick="closeAuth()">×</button>
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tab-login"    onclick="switchTab('login')">Sign in</div>
+      <div class="auth-tab"        id="tab-register" onclick="switchTab('register')">Create account</div>
+    </div>
+    <div class="auth-body">
+      <div id="auth-error" class="error-inline"></div>
+      <div class="form-row">
+        <label>Email</label>
+        <input type="email" id="auth-email" placeholder="you@medschool.edu" />
+      </div>
+      <div class="form-row">
+        <label>Password</label>
+        <input type="password" id="auth-password" placeholder="••••••••" />
+      </div>
+      <button class="btn-auth" id="auth-submit-btn" onclick="submitAuth()">Sign in</button>
+      <p style="text-align:center;font-size:.72rem;color:var(--text-muted);margin-top:.8rem">
+        Free: 3 lectures/month · No credit card needed
+      </p>
+    </div>
+  </div>
 </div>
 
-<main>
+<!-- Top bar -->
+<div class="topbar">
+  <div class="logo">DarwinCards</div>
+  <div class="topbar-right" id="topbar-right">
+    <button class="tb-btn ghost" onclick="openAuth('login')">Log in</button>
+    <button class="tb-btn filled" onclick="openAuth('register')">Sign up free</button>
+  </div>
+</div>
 
-  <!-- Video upload -->
-  <div class="card">
-    <div class="card-header"><div class="icon">📁</div> Lecture File</div>
-    <div class="card-body">
-      <div id="drop-zone" onclick="document.getElementById('file-input').click()">
-        <div class="dz-icon">📂</div>
-        <div class="dz-title">Drop your lecture file here</div>
-        <div class="dz-sub">or click to browse</div>
-        <div style="margin-top:.6rem; display:flex; gap:.4rem; justify-content:center; flex-wrap:wrap;">
-          <span class="fmt-badge video">🎬 Video</span>
-          <span class="fmt-badge audio">🎵 Audio</span>
-          <span class="fmt-badge txt">📄 Transcript</span>
-          <span class="fmt-badge pdf">📑 PDF Slides</span>
-          <span class="fmt-badge pptx">📊 PowerPoint</span>
-        </div>
-        <div id="file-label" style="display:none;margin-top:.8rem" class="dz-file">
-          <span id="file-icon">📹</span><span id="file-name"></span>
-        </div>
+<!-- Hero + orb -->
+<div class="hero">
+  <h1 class="hero-title">Drop your lecture.<br>Get Anki cards.</h1>
+  <p class="hero-sub">Upload a file and AI builds your deck in seconds.</p>
+
+  <!-- The orb -->
+  <div class="orb-wrap" id="orb"
+       onclick="document.getElementById('file-input').click()"
+       ondragover="orbDragOver(event)"
+       ondragleave="orbDragLeave(event)"
+       ondrop="orbDrop(event)">
+
+    <div class="orb-glow"></div>
+
+    <!-- SVG plasma using feTurbulence -->
+    <div class="orb-svg">
+      <svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="plasma" x="-10%" y="-10%" width="120%" height="120%">
+            <feTurbulence type="turbulence" baseFrequency="0.012 0.012" numOctaves="4" seed="2" result="turb">
+              <animate attributeName="baseFrequency" values="0.012 0.012;0.018 0.015;0.012 0.012" dur="8s" repeatCount="indefinite"/>
+              <animate attributeName="seed" values="2;8;15;2" dur="12s" repeatCount="indefinite"/>
+            </feTurbulence>
+            <feColorMatrix type="hueRotate" values="0" result="hue">
+              <animate attributeName="values" from="0" to="360" dur="6s" repeatCount="indefinite"/>
+            </feColorMatrix>
+            <feColorMatrix type="saturate" values="3" result="sat"/>
+            <feBlend in="sat" in2="SourceGraphic" mode="screen"/>
+          </filter>
+          <radialGradient id="sphereGrad" cx="40%" cy="35%" r="60%">
+            <stop offset="0%"   stop-color="rgba(255,255,255,.25)"/>
+            <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+          </radialGradient>
+          <clipPath id="circle-clip">
+            <circle cx="150" cy="150" r="148"/>
+          </clipPath>
+        </defs>
+        <!-- Plasma fill -->
+        <rect x="0" y="0" width="300" height="300" fill="#000" clip-path="url(#circle-clip)"/>
+        <rect x="0" y="0" width="300" height="300" filter="url(#plasma)" clip-path="url(#circle-clip)"/>
+        <!-- Sphere sheen -->
+        <circle cx="150" cy="150" r="148" fill="url(#sphereGrad)"/>
+        <!-- Thin border -->
+        <circle cx="150" cy="150" r="148" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="1.5"/>
+      </svg>
+    </div>
+
+    <div class="blob"></div>
+
+    <!-- Label overlay -->
+    <div class="orb-label" id="orb-label">
+      <div class="orb-icon" id="orb-icon">📂</div>
+      <div class="orb-title" id="orb-title">Drop your lecture here</div>
+      <div class="orb-sub"  id="orb-sub">or click to browse</div>
+      <div id="orb-file-name"></div>
+    </div>
+
+    <input type="file" id="file-input" accept=".mp4,.mov,.mkv,.avi,.m4v,.webm,.mp3,.m4a,.wav,.ogg,.txt,.pdf,.pptx,.ppt" />
+  </div>
+
+  <!-- Format pills -->
+  <div class="fmt-pills">
+    <span class="fmt-pill video">🎬 Video</span>
+    <span class="fmt-pill audio">🎵 Audio</span>
+    <span class="fmt-pill txt">📄 Transcript</span>
+    <span class="fmt-pill pdf">📑 PDF Slides</span>
+    <span class="fmt-pill pptx">📊 PowerPoint</span>
+  </div>
+
+  <button id="generate-btn" onclick="startGeneration()">✨ Generate My Anki Cards</button>
+</div>
+
+<!-- Content -->
+<div class="content">
+
+  <!-- Progress -->
+  <div id="progress-section">
+    <div class="card">
+      <div class="card-header">Generating your cards…</div>
+      <div class="card-body">
+        <div class="progress-log" id="progress-log"></div>
       </div>
-      <input type="file" id="file-input" accept=".mp4,.mov,.mkv,.avi,.m4v,.webm,.mp3,.m4a,.wav,.ogg,.txt,.pdf,.pptx,.ppt" />
     </div>
   </div>
 
-  <!-- API Keys -->
-  <div class="card">
-    <div class="card-header"><div class="icon">🔑</div> API Keys</div>
-    <div class="card-body">
-      <div class="form-row" id="openai-row">
-        <label>OpenAI API Key <span style="color:var(--red)">*</span> <span id="openai-badge" style="font-size:.7rem;font-weight:400;color:var(--gray-400)">(required for video/audio)</span></label>
-        <input type="password" id="openai-key" placeholder="sk-..." autocomplete="off" />
-        <div class="form-hint">Used for Whisper transcription · <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--blue)">Get one →</a></div>
+  <!-- Download -->
+  <div id="download-section">
+    <div class="card">
+      <div class="card-body">
+        <div class="result-banner success">
+          <div class="icon">✅</div>
+          <h3>Your deck is ready</h3>
+          <p>Double-click the .apkg to import into Anki</p>
+        </div>
+        <a id="download-btn" class="btn-download" href="#" download>⬇ Download .apkg Deck</a>
+        <button class="btn-ghost" onclick="restart()">Generate another deck</button>
       </div>
-      <div class="form-row">
-        <label>Anthropic API Key <span style="color:var(--red)">*</span></label>
-        <input type="password" id="anthropic-key" placeholder="sk-ant-..." autocomplete="off" />
-        <div class="form-hint">Used for Claude card generation · <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--blue)">Get one →</a></div>
+    </div>
+  </div>
+
+  <!-- Upgrade -->
+  <div id="upgrade-section">
+    <div class="card">
+      <div class="card-body">
+        <div class="result-banner warning">
+          <div class="icon">⚡</div>
+          <h3>Monthly limit reached</h3>
+          <p>You've used all 3 free lectures this month. Upgrade for unlimited.</p>
+        </div>
+        <button class="btn-upgrade" onclick="doUpgrade()">Upgrade to Pro — $9 / month</button>
+        <button class="btn-ghost" onclick="document.getElementById('upgrade-section').style.display='none'">Maybe later</button>
       </div>
-      <div class="form-hint" style="margin-top:.25rem">Keys are sent directly to the APIs and never stored on our servers.</div>
     </div>
   </div>
 
   <!-- Options -->
   <div class="card">
-    <div class="card-header"><div class="icon">⚙️</div> Options</div>
+    <div class="card-header">Card Options</div>
     <div class="card-body">
       <div class="form-row">
         <label>Deck Name</label>
-        <input type="text" id="deck-name" value="Lecture Cards" placeholder="e.g. Cardiology Week 3" />
+        <input type="text" id="deck-name" value="DarwinCards Deck" placeholder="e.g. Cardiology Week 3" />
       </div>
       <div class="two-col">
         <div class="form-row">
           <label>Card Types</label>
           <select id="card-type">
-            <option value="both">Basic + Cloze (recommended)</option>
-            <option value="basic">Basic only (Q&A)</option>
+            <option value="both">Basic + Cloze</option>
+            <option value="basic">Basic only</option>
             <option value="cloze">Cloze only</option>
           </select>
         </div>
         <div class="form-row">
-          <label>Cards per Section</label>
+          <label>Cards / Section</label>
           <select id="cards-per-chunk">
-            <option value="5">5 (concise)</option>
-            <option value="8" selected>8 (recommended)</option>
-            <option value="12">12 (comprehensive)</option>
-            <option value="20">20 (exhaustive)</option>
+            <option value="5">5 — concise</option>
+            <option value="8" selected>8 — recommended</option>
+            <option value="12">12 — comprehensive</option>
           </select>
         </div>
       </div>
+      <hr class="divider" />
       <details>
         <summary>Advanced options</summary>
-        <div class="two-col">
+        <div class="two-col" style="margin-top:.8rem">
           <div class="form-row">
-            <label>Lecture Language</label>
-            <input type="text" id="language" value="en" maxlength="5" style="max-width:80px" />
+            <label>Language</label>
+            <input type="text" id="language" value="en" style="max-width:80px" />
           </div>
           <div class="form-row">
             <label>Claude Model</label>
             <select id="claude-model">
-              <option value="claude-opus-4-6">claude-opus-4-6 (best)</option>
-              <option value="claude-sonnet-4-6">claude-sonnet-4-6 (fast)</option>
-              <option value="claude-haiku-4-5-20251001">claude-haiku (fastest)</option>
+              <option value="claude-opus-4-6">Opus (best)</option>
+              <option value="claude-sonnet-4-6">Sonnet (fast)</option>
+              <option value="claude-haiku-4-5-20251001">Haiku (fastest)</option>
             </select>
           </div>
         </div>
         <div class="form-row">
-          <label>Tags (space-separated)</label>
-          <input type="text" id="tags" placeholder="e.g. cardiology step1 week3" />
+          <label>Tags</label>
+          <input type="text" id="tags" placeholder="cardiology step1 week3" />
         </div>
       </details>
     </div>
   </div>
 
-  <!-- Generate button -->
-  <button id="generate-btn" onclick="startGeneration()">Generate Anki Cards →</button>
-
-  <!-- Progress -->
-  <div class="card" id="progress-card">
-    <div class="card-header"><div class="icon">⏳</div> Processing…</div>
-    <div class="card-body">
-      <div class="progress-log" id="progress-log"></div>
-    </div>
-  </div>
-
-  <!-- Download -->
-  <div class="card" id="download-card">
-    <div class="card-body">
-      <div class="success-banner">
-        <div class="check">🎉</div>
-        <h3>Your deck is ready!</h3>
-        <p>Generated <span id="card-count">—</span> cards — double-click the .apkg file to import into Anki</p>
-      </div>
-      <a id="download-btn" href="#" download>
-        ⬇️ Download .apkg Deck
-      </a>
-      <button id="restart-btn" onclick="restart()">Generate another deck</button>
-    </div>
-  </div>
-
-</main>
-
-<footer>
-  DarwinCards · Powered by OpenAI Whisper + Anthropic Claude · Keys never stored
-</footer>
+</div>
 
 <script>
-  let selectedFile = null;
-  let currentJobId = null;
-  let eventSource = null;
-  let logLines = [];
+  let token = localStorage.getItem('dc_token') || null;
+  let userInfo = null, selectedFile = null, eventSource = null, logLines = [], authMode = 'login';
 
-  const VIDEO_EXTS  = new Set(['.mp4','.mov','.mkv','.avi','.m4v','.webm']);
-  const AUDIO_EXTS  = new Set(['.mp3','.m4a','.wav','.ogg']);
-  const TEXT_EXTS   = new Set(['.txt']);
-  const PDF_EXTS    = new Set(['.pdf']);
-  const PPTX_EXTS   = new Set(['.pptx','.ppt']);
-
+  const VIDEO_EXTS = new Set(['.mp4','.mov','.mkv','.avi','.m4v','.webm']);
+  const AUDIO_EXTS = new Set(['.mp3','.m4a','.wav','.ogg']);
   const FILE_META = {
-    video:  { icon: '🎬', label: 'Video selected',      badge: 'video' },
-    audio:  { icon: '🎵', label: 'Audio selected',      badge: 'audio' },
-    txt:    { icon: '📄', label: 'Transcript selected',  badge: 'txt'   },
-    pdf:    { icon: '📑', label: 'PDF slides selected',  badge: 'pdf'   },
-    pptx:   { icon: '📊', label: 'Slides selected',      badge: 'pptx'  },
+    video: { icon: '🎬', label: 'Video loaded',        sub: 'Ready to transcribe', badge: 'video' },
+    audio: { icon: '🎵', label: 'Audio loaded',        sub: 'Ready to transcribe', badge: 'audio' },
+    txt:   { icon: '📄', label: 'Transcript loaded',   sub: 'Ready to generate',   badge: 'txt'   },
+    pdf:   { icon: '📑', label: 'PDF slides loaded',   sub: 'Ready to generate',   badge: 'pdf'   },
+    pptx:  { icon: '📊', label: 'Slides loaded',       sub: 'Ready to generate',   badge: 'pptx'  },
   };
 
-  function getFileType(filename) {
-    const ext = '.' + filename.split('.').pop().toLowerCase();
-    if (VIDEO_EXTS.has(ext)) return 'video';
-    if (AUDIO_EXTS.has(ext)) return 'audio';
-    if (TEXT_EXTS.has(ext))  return 'txt';
-    if (PDF_EXTS.has(ext))   return 'pdf';
-    if (PPTX_EXTS.has(ext))  return 'pptx';
-    return 'video';
+  window.addEventListener('load', async () => {
+    if (token) await loadUser(); else updateTopbar(null);
+    const p = new URLSearchParams(window.location.search);
+    if (p.get('upgraded') === '1') {
+      await loadUser();
+      alert('🎉 Welcome to Pro! Unlimited lectures are now yours.');
+      window.history.replaceState({}, '', '/');
+    }
+  });
+
+  async function loadUser() {
+    try {
+      const r = await apiFetch('/api/auth/me');
+      if (!r.ok) throw 0;
+      userInfo = await r.json();
+      updateTopbar(userInfo);
+    } catch { token = null; localStorage.removeItem('dc_token'); updateTopbar(null); }
   }
 
-  // ── File selection ──────────────────────────────────────────────────────
+  function updateTopbar(u) {
+    const el = document.getElementById('topbar-right');
+    if (!u) {
+      el.innerHTML = `<button class="tb-btn ghost" onclick="openAuth('login')">Log in</button>
+                      <button class="tb-btn filled" onclick="openAuth('register')">Sign up free</button>`;
+    } else {
+      const rem = u.plan === 'pro' ? '∞' : Math.max(0, 3 - u.usage_this_month) + ' left';
+      const planBadge = `<span class="tb-plan ${u.plan}">${u.plan === 'pro' ? '⭐ Pro' : 'Free'}</span>`;
+      const upgradeBtn = (u.plan === 'free' && u.usage_this_month >= 3)
+        ? `<button class="tb-upgrade" onclick="doUpgrade()">Upgrade</button>` : '';
+      el.innerHTML = `<span class="tb-user">${u.email} ${planBadge} <span style="opacity:.5;font-size:.7rem">${rem}</span></span>
+                      ${upgradeBtn}
+                      <button class="tb-signout" onclick="doLogout()">Sign out</button>`;
+    }
+  }
 
-  const dropZone = document.getElementById('drop-zone');
-  const fileInput = document.getElementById('file-input');
+  // Auth modal
+  function openAuth(mode) { authMode = mode; switchTab(mode); document.getElementById('auth-modal').classList.add('open'); }
+  function closeAuth() { document.getElementById('auth-modal').classList.remove('open'); }
+  document.getElementById('auth-modal').addEventListener('click', e => { if (e.target === document.getElementById('auth-modal')) closeAuth(); });
 
-  fileInput.addEventListener('change', e => {
-    if (e.target.files[0]) selectFile(e.target.files[0]);
-  });
+  function switchTab(mode) {
+    authMode = mode;
+    document.getElementById('tab-login').classList.toggle('active',    mode === 'login');
+    document.getElementById('tab-register').classList.toggle('active', mode === 'register');
+    document.getElementById('auth-submit-btn').textContent = mode === 'login' ? 'Sign in' : 'Create account';
+    document.getElementById('auth-error').style.display = 'none';
+  }
 
-  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-  dropZone.addEventListener('drop', e => {
+  async function submitAuth() {
+    const email = document.getElementById('auth-email').value.trim();
+    const pwd   = document.getElementById('auth-password').value;
+    if (!email || !pwd) { showAuthErr('Fill in all fields.'); return; }
+    const btn = document.getElementById('auth-submit-btn');
+    btn.disabled = true; btn.textContent = authMode === 'login' ? 'Signing in…' : 'Creating account…';
+    try {
+      let res, data;
+      if (authMode === 'register') {
+        res = await fetch('/api/auth/register', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, password: pwd }) });
+      } else {
+        res = await fetch('/api/auth/login', { method:'POST', body: new URLSearchParams({ username: email, password: pwd }) });
+      }
+      data = await res.json();
+      if (!res.ok) { showAuthErr(data.detail || 'Something went wrong.'); return; }
+      token = data.access_token;
+      localStorage.setItem('dc_token', token);
+      await loadUser();
+      closeAuth();
+    } catch { showAuthErr('Network error.'); }
+    finally { btn.disabled = false; btn.textContent = authMode === 'login' ? 'Sign in' : 'Create account'; }
+  }
+
+  function showAuthErr(msg) { const e = document.getElementById('auth-error'); e.textContent = msg; e.style.display = 'block'; }
+  function doLogout() { token = null; userInfo = null; localStorage.removeItem('dc_token'); updateTopbar(null); }
+  async function doUpgrade() {
+    try { const r = await apiFetch('/api/billing/checkout', {method:'POST'}); const d = await r.json(); if (d.url) window.location.href = d.url; }
+    catch { alert('Could not start checkout.'); }
+  }
+
+  // Orb interactions
+  function orbDragOver(e) { e.preventDefault(); document.getElementById('orb').classList.add('drag-over'); }
+  function orbDragLeave(e) { document.getElementById('orb').classList.remove('drag-over'); }
+  function orbDrop(e) {
     e.preventDefault();
-    dropZone.classList.remove('drag-over');
+    document.getElementById('orb').classList.remove('drag-over');
     if (e.dataTransfer.files[0]) selectFile(e.dataTransfer.files[0]);
-  });
+  }
+
+  document.getElementById('file-input').addEventListener('change', e => { if (e.target.files[0]) selectFile(e.target.files[0]); });
+
+  function getType(name) {
+    const ext = '.' + name.split('.').pop().toLowerCase();
+    if (VIDEO_EXTS.has(ext)) return 'video'; if (AUDIO_EXTS.has(ext)) return 'audio';
+    if (ext === '.txt') return 'txt'; if (ext === '.pdf') return 'pdf'; return 'pptx';
+  }
 
   function selectFile(file) {
     selectedFile = file;
-    const ftype = getFileType(file.name);
-    const meta  = FILE_META[ftype];
-
-    document.getElementById('file-icon').textContent  = meta.icon;
-    document.getElementById('file-name').textContent  = file.name;
-    document.getElementById('file-label').style.display = 'inline-flex';
-    document.querySelector('#drop-zone .dz-title').textContent = meta.label;
-    document.querySelector('#drop-zone .dz-sub').textContent   = `${(file.size / 1024 / 1024).toFixed(1)} MB`;
-
-    // Highlight the matching badge
-    document.querySelectorAll('.fmt-badge').forEach(b => b.classList.remove('active'));
-    const activeBadge = document.querySelector(`.fmt-badge.${meta.badge}`);
-    if (activeBadge) activeBadge.classList.add('active');
-
-    // Show/hide OpenAI key row
-    const needsOpenAI = ftype === 'video' || ftype === 'audio';
-    const openaiRow = document.getElementById('openai-row');
-    openaiRow.style.opacity = needsOpenAI ? '1' : '0.4';
-    openaiRow.querySelector('input').required = needsOpenAI;
-    document.getElementById('openai-badge').textContent = needsOpenAI
-      ? '(required for video/audio)'
-      : '(not needed for this file type ✓)';
+    const meta = FILE_META[getType(file.name)];
+    document.getElementById('orb-icon').textContent  = meta.icon;
+    document.getElementById('orb-title').textContent = meta.label;
+    document.getElementById('orb-sub').textContent   = `${(file.size/1024/1024).toFixed(1)} MB`;
+    document.getElementById('orb-file-name').textContent = file.name;
+    document.querySelectorAll('.fmt-pill').forEach(p => p.classList.remove('active'));
+    document.querySelector(`.fmt-pill.${meta.badge}`)?.classList.add('active');
   }
 
-  // ── Generation ──────────────────────────────────────────────────────────
+  function setOrbState(state) {
+    const orb = document.getElementById('orb');
+    orb.classList.remove('drag-over','processing','done');
+    if (state) orb.classList.add(state);
+  }
 
   async function startGeneration() {
-    const openaiKey    = document.getElementById('openai-key').value.trim();
-    const anthropicKey = document.getElementById('anthropic-key').value.trim();
-
-    if (!selectedFile) { alert('Please select a file first.'); return; }
-
-    const ftype = getFileType(selectedFile.name);
-    const needsOpenAI = ftype === 'video' || ftype === 'audio';
-    if (needsOpenAI && !openaiKey) { alert('Please enter your OpenAI API key for video/audio files.'); return; }
-    if (!anthropicKey) { alert('Please enter your Anthropic API key.'); return; }
-
+    if (!token) { openAuth('login'); return; }
+    if (!selectedFile) { alert('Drop a file into the orb first.'); return; }
+    if (userInfo?.plan === 'free' && !userInfo.can_generate) {
+      document.getElementById('upgrade-section').style.display = 'block';
+      document.getElementById('upgrade-section').scrollIntoView({behavior:'smooth'});
+      return;
+    }
     document.getElementById('generate-btn').disabled = true;
-    showCard('progress-card');
-    logLines = [];
-    renderLog();
+    document.getElementById('download-section').style.display = 'none';
+    document.getElementById('upgrade-section').style.display  = 'none';
+    document.getElementById('progress-section').style.display = 'block';
+    logLines = []; renderLog();
+    setOrbState('processing');
+    document.getElementById('orb-icon').textContent  = '⚡';
+    document.getElementById('orb-title').textContent = 'Generating…';
+    document.getElementById('orb-sub').textContent   = 'Sit tight';
 
-    const formData = new FormData();
-    formData.append('file',              selectedFile);
-    formData.append('openai_api_key',    openaiKey);
-    formData.append('anthropic_api_key', anthropicKey);
-    formData.append('deck_name',         document.getElementById('deck-name').value || 'DarwinCards Deck');
-    formData.append('card_type',         document.getElementById('card-type').value);
-    formData.append('cards_per_chunk',   document.getElementById('cards-per-chunk').value);
-    formData.append('language',          document.getElementById('language').value || 'en');
-    formData.append('claude_model',      document.getElementById('claude-model').value);
-    formData.append('tags',              document.getElementById('tags').value);
+    const fd = new FormData();
+    fd.append('file',            selectedFile);
+    fd.append('deck_name',       document.getElementById('deck-name').value || 'DarwinCards Deck');
+    fd.append('card_type',       document.getElementById('card-type').value);
+    fd.append('cards_per_chunk', document.getElementById('cards-per-chunk').value);
+    fd.append('language',        document.getElementById('language').value || 'en');
+    fd.append('claude_model',    document.getElementById('claude-model').value);
+    fd.append('tags',            document.getElementById('tags').value);
 
     let jobId;
     try {
-      const res = await fetch('/api/generate', { method: 'POST', body: formData });
-      if (!res.ok) { const t = await res.text(); throw new Error(t); }
-      const data = await res.json();
-      jobId = data.job_id;
-      currentJobId = jobId;
-    } catch (err) {
-      showError(`Upload failed: ${err.message}`);
-      return;
-    }
+      const res = await apiFetch('/api/generate', {method:'POST', body: fd});
+      if (res.status === 402) {
+        setOrbState(null); resetOrbLabel();
+        document.getElementById('progress-section').style.display = 'none';
+        document.getElementById('upgrade-section').style.display  = 'block';
+        document.getElementById('generate-btn').disabled = false;
+        return;
+      }
+      if (!res.ok) { const t = await res.json(); throw new Error(t.detail || 'Upload failed'); }
+      jobId = (await res.json()).job_id;
+    } catch (err) { showErr(err.message); return; }
 
     eventSource = new EventSource(`/api/progress/${jobId}`);
-    eventSource.onmessage = e => handleMessage(e.data, jobId);
-    eventSource.onerror   = () => { eventSource.close(); };
+    eventSource.onmessage = e => {
+      const msg = e.data;
+      if (msg.startsWith('__DONE__')) {
+        eventSource.close(); markLastDone();
+        setOrbState('done');
+        document.getElementById('orb-icon').textContent  = '✅';
+        document.getElementById('orb-title').textContent = 'Deck ready!';
+        document.getElementById('orb-sub').textContent   = 'Download below';
+        document.getElementById('orb-file-name').textContent = '';
+        document.getElementById('progress-section').style.display = 'none';
+        document.getElementById('download-btn').href = `/api/download/${jobId}`;
+        document.getElementById('download-section').style.display = 'block';
+        document.getElementById('download-section').scrollIntoView({behavior:'smooth'});
+        document.getElementById('generate-btn').disabled = false;
+        loadUser();
+      } else if (msg.startsWith('__ERROR__')) {
+        eventSource.close(); showErr(msg.replace('__ERROR__',''));
+      } else {
+        addLog(msg);
+      }
+    };
+    eventSource.onerror = () => eventSource.close();
   }
 
-  function handleMessage(msg, jobId) {
-    if (msg.startsWith('__DONE__')) {
-      eventSource && eventSource.close();
-      markLastDone();
-      showDownload(jobId);
-    } else if (msg.startsWith('__ERROR__')) {
-      eventSource && eventSource.close();
-      const err = msg.replace('__ERROR__', '');
-      showError(err);
-    } else {
-      addLogLine(msg);
-    }
-  }
-
-  // ── Log rendering ───────────────────────────────────────────────────────
-
-  function addLogLine(msg) {
-    if (logLines.length > 0) logLines[logLines.length - 1].done = true;
-    logLines.push({ text: msg, done: false });
-    renderLog();
-  }
-
-  function markLastDone() {
-    if (logLines.length > 0) logLines[logLines.length - 1].done = true;
-    renderLog();
-  }
-
+  function addLog(msg) { if (logLines.length) logLines[logLines.length-1].done = true; logLines.push({text:msg,done:false}); renderLog(); }
+  function markLastDone() { if (logLines.length) logLines[logLines.length-1].done = true; renderLog(); }
   function renderLog() {
     const el = document.getElementById('progress-log');
-    el.innerHTML = logLines.map(l => {
-      if (l.done) {
-        return `<div class="log-line done"><span class="dot">✓</span><span>${l.text}</span></div>`;
-      } else {
-        return `<div class="log-line active"><span class="spinner"></span><span>${l.text}</span></div>`;
-      }
-    }).join('');
+    el.innerHTML = logLines.map(l => l.done
+      ? `<div class="log-line done"><span>✓</span><span>${l.text}</span></div>`
+      : `<div class="log-line active"><span class="spinner"></span><span>${l.text}</span></div>`
+    ).join('');
     el.scrollTop = el.scrollHeight;
   }
-
-  // ── Download ────────────────────────────────────────────────────────────
-
-  async function showDownload(jobId) {
-    // Estimate card count from log messages (look for "X card(s)")
-    const countMsg = logLines.find(l => l.text.includes('card'));
-    const match = countMsg ? countMsg.text.match(/(\d+)\s+card/) : null;
-    document.getElementById('card-count').textContent = match ? match[1] : 'your';
-
-    document.getElementById('download-btn').href = `/api/download/${jobId}`;
-    hideCard('progress-card');
-    showCard('download-card');
+  function showErr(msg) {
+    document.getElementById('progress-log').innerHTML += `<div class="error-inline">✗ ${msg}</div>`;
+    setOrbState(null); resetOrbLabel();
     document.getElementById('generate-btn').disabled = false;
   }
-
-  function showError(msg) {
-    const log = document.getElementById('progress-log');
-    log.innerHTML += `<div class="error-banner" style="margin-top:.75rem">❌ ${msg}</div>`;
-    document.getElementById('generate-btn').disabled = false;
+  function resetOrbLabel() {
+    document.getElementById('orb-icon').textContent  = '📂';
+    document.getElementById('orb-title').textContent = 'Drop your lecture here';
+    document.getElementById('orb-sub').textContent   = 'or click to browse';
+    document.getElementById('orb-file-name').textContent = '';
   }
-
   function restart() {
-    hideCard('download-card');
-    hideCard('progress-card');
-    document.getElementById('generate-btn').disabled = false;
+    selectedFile = null;
+    document.getElementById('download-section').style.display = 'none';
+    document.getElementById('progress-section').style.display = 'none';
+    setOrbState(null); resetOrbLabel();
+    document.querySelectorAll('.fmt-pill').forEach(p => p.classList.remove('active'));
     logLines = [];
   }
 
-  function showCard(id) { document.getElementById(id).style.display = 'block'; }
-  function hideCard(id) { document.getElementById(id).style.display = 'none'; }
+  function apiFetch(url, opts = {}) {
+    opts.headers = opts.headers || {};
+    if (token && !(opts.body instanceof FormData)) opts.headers['Content-Type'] = 'application/json';
+    if (token) opts.headers['Authorization'] = `Bearer ${token}`;
+    return fetch(url, opts);
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && document.getElementById('auth-modal').classList.contains('open')) submitAuth();
+    if (e.key === 'Escape') closeAuth();
+  });
 </script>
 </body>
 </html>
