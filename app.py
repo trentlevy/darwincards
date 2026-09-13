@@ -1,27 +1,18 @@
 """
-DarwinCards – Web App
-FastAPI backend with auth, usage limits, and Stripe billing.
+DarwinCards – Web App (open access, cost-capped)
 
-Plans
------
-  free : 3 lectures/month
-  pro  : unlimited, $9/month via Stripe
+Anyone can generate cards using the owner's API keys.
+Two guards prevent runaway spend:
+  1. Global monthly cap  – stops all generation once estimated spend hits $95.
+  2. Per-IP daily limit  – max 5 generations per IP per 24 hours.
 
 Endpoints
 ---------
-POST /api/auth/register         Create account
-POST /api/auth/login            Login, returns JWT
-GET  /api/auth/me               Current user info + usage
-
-POST /api/billing/checkout      Create Stripe checkout session (upgrade to Pro)
-POST /api/billing/portal        Stripe customer portal (manage subscription)
-POST /api/billing/webhook       Stripe webhook handler
-
+GET  /                          Frontend
 POST /api/generate              Upload file, returns {job_id}
 GET  /api/progress/{job_id}     SSE progress stream
 GET  /api/download/{job_id}     Download .apkg
-
-GET  /                          Frontend
+GET  /api/status                Current monthly cost / capacity info
 """
 
 import asyncio
@@ -30,25 +21,17 @@ import os
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
-import stripe
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Depends, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, EmailStr
 from sse_starlette.sse import EventSourceResponse
 from sqlalchemy.orm import Session
 
-from database import Base, engine, get_db
-from models import User, UsageLog
-from auth import (
-    hash_password, verify_password, create_access_token,
-    get_current_user, get_current_user_optional,
-)
-from stripe_utils import create_checkout_session, create_portal_session, handle_webhook
-from pipeline import generate_cards_from_file, VIDEO_EXTS, AUDIO_EXTS
+from database import Base, engine, get_db, SessionLocal
+from models import GlobalUsage, GenerationLog
+from pipeline import generate_cards_from_file
 
 # ---------------------------------------------------------------------------
 # Setup
@@ -64,22 +47,42 @@ if STATIC_DIR.exists():
 
 jobs: Dict[str, Any] = {}
 
-FREE_LIMIT = 3   # lectures per month on free plan
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
-OPENAI_API_KEY     = os.environ.get("OPENAI_API_KEY", "")
-ANTHROPIC_API_KEY  = os.environ.get("ANTHROPIC_API_KEY", "")
+# Cost guard — stop accepting jobs once estimated monthly spend reaches this
+MONTHLY_COST_LIMIT_USD = 95.0
+
+# Per-IP rate limit — max generations per rolling 24-hour window
+IP_DAILY_LIMIT = 5
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def usage_this_month(user: User, db: Session) -> int:
-    start = datetime.datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    return db.query(UsageLog).filter(
-        UsageLog.user_id == user.id,
-        UsageLog.created_at >= start,
-    ).count()
+def get_client_ip(request: Request) -> str:
+    """Resolve real client IP, accounting for Railway's proxy."""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    if request.client:
+        return request.client.host
+    return "unknown"
+
+
+def current_month() -> str:
+    return datetime.datetime.utcnow().strftime("%Y-%m")
+
+
+def get_or_create_monthly(db: Session) -> GlobalUsage:
+    m = current_month()
+    row = db.query(GlobalUsage).filter(GlobalUsage.month == m).first()
+    if not row:
+        row = GlobalUsage(month=m, estimated_cost_usd=0.0, generation_count=0)
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+    return row
 
 
 # ---------------------------------------------------------------------------
@@ -95,158 +98,78 @@ async def serve_frontend():
 
 
 # ---------------------------------------------------------------------------
-# Auth routes
+# Status
 # ---------------------------------------------------------------------------
 
-class RegisterRequest(BaseModel):
-    email: str
-    password: str
-
-@app.post("/api/auth/register")
-def register(req: RegisterRequest, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.email == req.email.lower()).first():
-        raise HTTPException(status_code=400, detail="Email already registered")
-    if len(req.password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
-    user = User(email=req.email.lower(), hashed_password=hash_password(req.password))
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    token = create_access_token(user.id)
-    return {"access_token": token, "token_type": "bearer", "plan": user.plan}
-
-
-@app.post("/api/auth/login")
-def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == form.username.lower()).first()
-    if not user or not verify_password(form.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Incorrect email or password")
-    token = create_access_token(user.id)
-    return {"access_token": token, "token_type": "bearer", "plan": user.plan}
-
-
-@app.get("/api/auth/me")
-def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    used = usage_this_month(user, db)
+@app.get("/api/status")
+def get_status(db: Session = Depends(get_db)):
+    monthly = get_or_create_monthly(db)
     return {
-        "email": user.email,
-        "plan": user.plan,
-        "usage_this_month": used,
-        "limit": FREE_LIMIT if user.plan == "free" else None,
-        "can_generate": user.plan == "pro" or used < FREE_LIMIT,
+        "at_capacity": monthly.estimated_cost_usd >= MONTHLY_COST_LIMIT_USD,
+        "estimated_cost_usd": round(monthly.estimated_cost_usd, 4),
+        "generation_count": monthly.generation_count,
+        "month": monthly.month,
+        "limit_usd": MONTHLY_COST_LIMIT_USD,
     }
 
 
 # ---------------------------------------------------------------------------
-# Billing routes
-# ---------------------------------------------------------------------------
-
-@app.post("/api/billing/checkout")
-def billing_checkout(user: User = Depends(get_current_user)):
-    if user.plan == "pro":
-        raise HTTPException(status_code=400, detail="Already on Pro plan")
-    url = create_checkout_session(user.email, user.id)
-    return {"url": url}
-
-
-@app.post("/api/billing/portal")
-def billing_portal(user: User = Depends(get_current_user)):
-    if not user.stripe_customer_id:
-        raise HTTPException(status_code=400, detail="No billing account found")
-    url = create_portal_session(user.stripe_customer_id)
-    return {"url": url}
-
-
-@app.post("/api/billing/webhook")
-async def billing_webhook(request: Request, db: Session = Depends(get_db)):
-    payload    = await request.body()
-    sig_header = request.headers.get("stripe-signature", "")
-    event      = handle_webhook(payload, sig_header)
-
-    etype = event["type"]
-    data  = event["data"]["object"]
-
-    if etype == "checkout.session.completed":
-        user_id     = int(data["metadata"]["user_id"])
-        customer_id = data["customer"]
-        sub_id      = data["subscription"]
-        user = db.query(User).filter(User.id == user_id).first()
-        if user:
-            user.plan = "pro"
-            user.stripe_customer_id     = customer_id
-            user.stripe_subscription_id = sub_id
-            db.commit()
-
-    elif etype in ("customer.subscription.deleted", "customer.subscription.paused"):
-        sub_id = data["id"]
-        user = db.query(User).filter(User.stripe_subscription_id == sub_id).first()
-        if user:
-            user.plan = "free"
-            user.stripe_subscription_id = None
-            db.commit()
-
-    elif etype == "customer.subscription.updated":
-        sub_id = data["id"]
-        status = data["status"]
-        user = db.query(User).filter(User.stripe_subscription_id == sub_id).first()
-        if user:
-            user.plan = "pro" if status == "active" else "free"
-            db.commit()
-
-    return {"received": True}
-
-
-# ---------------------------------------------------------------------------
-# Generate endpoint
+# Generate
 # ---------------------------------------------------------------------------
 
 @app.post("/api/generate")
 async def start_generation(
+    request: Request,
     file: UploadFile = File(...),
     deck_name: str = Form("DarwinCards Deck"),
     card_type: str = Form("both"),
     cards_per_chunk: int = Form(8),
     language: str = Form("en"),
-    claude_model: str = Form("claude-opus-4-6"),
+    claude_model: str = Form("claude-sonnet-4-6"),
     tags: str = Form(""),
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # Check API keys are configured server-side
     if not ANTHROPIC_API_KEY:
-        raise HTTPException(status_code=500, detail="Server not configured. Contact support.")
+        raise HTTPException(status_code=500, detail="Server not configured. Contact the site owner.")
 
-    # Check usage limit
-    if current_user.plan == "free":
-        used = usage_this_month(current_user, db)
-        if used >= FREE_LIMIT:
-            raise HTTPException(
-                status_code=402,
-                detail=f"Free limit reached ({FREE_LIMIT} lectures/month). Please upgrade to Pro."
-            )
+    ip = get_client_ip(request)
 
-    # Log usage immediately
-    log = UsageLog(user_id=current_user.id)
-    db.add(log)
-    db.commit()
+    # Global monthly cost check
+    monthly = get_or_create_monthly(db)
+    if monthly.estimated_cost_usd >= MONTHLY_COST_LIMIT_USD:
+        raise HTTPException(
+            status_code=503,
+            detail="DarwinCards is at capacity for this month. Check back next month."
+        )
 
+    # Per-IP daily limit
+    cutoff = datetime.datetime.utcnow() - datetime.timedelta(hours=24)
+    ip_count = db.query(GenerationLog).filter(
+        GenerationLog.ip_address == ip,
+        GenerationLog.created_at >= cutoff,
+    ).count()
+    if ip_count >= IP_DAILY_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail=f"You've reached the daily limit ({IP_DAILY_LIMIT} generations per day). Check back tomorrow."
+        )
+
+    # Save upload to a temp file
     job_id = str(uuid.uuid4())
     jobs[job_id] = {"status": "running", "messages": [], "apkg_path": None, "error": None}
 
-    ext = Path(file.filename).suffix.lower()
-    suffix = ext or ".tmp"
-    tmp_file = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
-    contents = await file.read()
-    tmp_file.write(contents)
-    tmp_file.close()
+    ext = Path(file.filename or "upload.tmp").suffix.lower()
+    tmp = tempfile.NamedTemporaryFile(suffix=ext or ".tmp", delete=False)
+    tmp.write(await file.read())
+    tmp.close()
 
     tag_list = [t.strip() for t in tags.split() if t.strip()]
 
     loop = asyncio.get_event_loop()
     loop.run_in_executor(
         None, _run_pipeline,
-        job_id, tmp_file.name,
-        OPENAI_API_KEY, ANTHROPIC_API_KEY,
+        job_id, ip, tmp.name,
+        ANTHROPIC_API_KEY,
         deck_name, card_type, cards_per_chunk,
         language, claude_model, tag_list,
     )
@@ -254,17 +177,18 @@ async def start_generation(
     return {"job_id": job_id}
 
 
-def _run_pipeline(job_id, file_path, openai_key, anthropic_key,
-                  deck_name, card_type, cards_per_chunk, language, claude_model, tags):
+def _run_pipeline(job_id, ip_address, file_path,
+                  anthropic_key,
+                  deck_name, card_type, cards_per_chunk,
+                  language, claude_model, tags):
     job = jobs[job_id]
 
     def progress(msg: str):
         job["messages"].append(msg)
 
     try:
-        apkg_path = generate_cards_from_file(
+        apkg_path, usage_stats = generate_cards_from_file(
             file_path=file_path,
-            openai_api_key=openai_key,
             anthropic_api_key=anthropic_key,
             deck_name=deck_name,
             card_type=card_type,
@@ -277,6 +201,32 @@ def _run_pipeline(job_id, file_path, openai_key, anthropic_key,
         job["apkg_path"] = apkg_path
         job["status"] = "done"
         job["messages"].append("__DONE__")
+
+        # Log cost (non-fatal)
+        try:
+            db = SessionLocal()
+            try:
+                db.add(GenerationLog(
+                    ip_address=ip_address,
+                    estimated_cost_usd=usage_stats["estimated_cost_usd"],
+                    input_tokens=usage_stats["input_tokens"],
+                    output_tokens=usage_stats["output_tokens"],
+                    model=usage_stats["model"],
+                ))
+                m = current_month()
+                monthly = db.query(GlobalUsage).filter(GlobalUsage.month == m).first()
+                if not monthly:
+                    monthly = GlobalUsage(month=m, estimated_cost_usd=0.0, generation_count=0)
+                    db.add(monthly)
+                monthly.estimated_cost_usd = (monthly.estimated_cost_usd or 0) + usage_stats["estimated_cost_usd"]
+                monthly.generation_count   = (monthly.generation_count or 0) + 1
+                monthly.updated_at         = datetime.datetime.utcnow()
+                db.commit()
+            finally:
+                db.close()
+        except Exception as cost_err:
+            print(f"[cost logging error] {cost_err}")
+
     except Exception as e:
         job["status"] = "error"
         job["error"] = str(e)
@@ -289,7 +239,7 @@ def _run_pipeline(job_id, file_path, openai_key, anthropic_key,
 
 
 # ---------------------------------------------------------------------------
-# SSE + Download
+# SSE progress stream
 # ---------------------------------------------------------------------------
 
 @app.get("/api/progress/{job_id}")
@@ -315,8 +265,12 @@ async def progress_stream(job_id: str):
     return EventSourceResponse(event_generator())
 
 
+# ---------------------------------------------------------------------------
+# Download
+# ---------------------------------------------------------------------------
+
 @app.get("/api/download/{job_id}")
-async def download_apkg(job_id: str, current_user: User = Depends(get_current_user)):
+async def download_apkg(job_id: str):
     if job_id not in jobs:
         raise HTTPException(status_code=404, detail="Job not found")
     job = jobs[job_id]

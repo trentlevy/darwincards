@@ -8,12 +8,14 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg: #0a0a12;
-      --surface: rgba(255,255,255,.04);
-      --border: rgba(255,255,255,.08);
-      --text: #e8e8f0;
-      --text-muted: rgba(232,232,240,.45);
-      --radius: 12px;
+      --bg:        #0d1526;
+      --surface:   rgba(255,255,255,.04);
+      --border:    rgba(96,165,250,.12);
+      --text:      #e2e8f0;
+      --text-muted:rgba(226,232,240,.45);
+      --blue:      #3b82f6;
+      --blue-glow: rgba(59,130,246,.35);
+      --radius:    12px;
     }
 
     body {
@@ -37,209 +39,206 @@
       font-size: 1.1rem;
       font-weight: 800;
       letter-spacing: -.02em;
-      background: linear-gradient(90deg, #a78bfa, #60a5fa, #34d399, #f59e0b, #f472b6);
-      background-size: 300%;
+      background: linear-gradient(90deg, #60a5fa, #818cf8, #38bdf8);
+      background-size: 200%;
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      animation: logohue 6s linear infinite;
+      animation: logohue 5s linear infinite;
     }
-    @keyframes logohue { to { background-position: 300% 0; } }
+    @keyframes logohue { to { background-position: 200% 0; } }
     .topbar-right { display: flex; align-items: center; gap: .75rem; }
-
-    /* auth buttons (logged out) */
-    .tb-btn {
-      padding: .38rem 1rem;
-      border-radius: 6px;
-      font-size: .8rem;
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
-      transition: opacity .15s;
+    .tb-tag {
+      font-size: .72rem; font-weight: 600;
+      color: rgba(96,165,250,.7);
+      background: rgba(59,130,246,.1);
+      border: 1px solid rgba(59,130,246,.2);
+      border-radius: 999px; padding: .2rem .7rem;
     }
-    .tb-btn:hover { opacity: .8; }
-    .tb-btn.ghost  { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
-    .tb-btn.filled { background: white; color: #0a0a12; }
 
-    /* user info (logged in) */
-    .tb-user { font-size: .78rem; color: var(--text-muted); }
-    .tb-plan { padding: .2rem .6rem; border-radius: 999px; font-size: .68rem; font-weight: 700; margin-left: .4rem; }
-    .tb-plan.free { background: rgba(245,158,11,.15); color: #f59e0b; }
-    .tb-plan.pro  { background: rgba(52,211,153,.15); color: #34d399; }
-    .tb-signout { background: none; border: none; color: var(--text-muted); font-size: .75rem; cursor: pointer; text-decoration: underline; }
-    .tb-upgrade { background: linear-gradient(135deg, #7c3aed, #2563eb); color: white; border: none; border-radius: 6px; padding: .3rem .85rem; font-size: .75rem; font-weight: 700; cursor: pointer; }
+    /* Capacity banner */
+    #capacity-banner {
+      display: none;
+      background: rgba(245,158,11,.1); border-bottom: 1px solid rgba(245,158,11,.25);
+      padding: .65rem 2rem; text-align: center;
+      font-size: .82rem; color: #fbbf24;
+    }
 
     /* ── Hero ── */
     .hero {
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 3rem 1rem 2rem;
+      padding: 3.5rem 1rem 2rem;
     }
     .hero-title {
-      font-size: 2rem;
+      font-size: 1.95rem;
       font-weight: 800;
       letter-spacing: -.03em;
       text-align: center;
-      margin-bottom: .5rem;
+      margin-bottom: .6rem;
+      color: #f1f5f9;
+      line-height: 1.2;
     }
     .hero-sub {
-      font-size: .9rem;
+      font-size: .88rem;
       color: var(--text-muted);
       text-align: center;
-      margin-bottom: 2.5rem;
+      margin-bottom: 3rem;
+      max-width: 420px;
+      line-height: 1.6;
     }
 
-    /* ── Plasma Orb ── */
+    /* ── Orb wrapper ── */
     .orb-wrap {
       position: relative;
-      width: 300px;
-      height: 300px;
+      width: 280px;
+      height: 280px;
       margin-bottom: 2rem;
       cursor: pointer;
     }
 
-    /* Glow layers behind orb */
-    .orb-glow {
+    /* Outer ambient glow */
+    .orb-ambient {
       position: absolute;
-      inset: -40px;
+      inset: -50px;
       border-radius: 50%;
-      filter: blur(50px);
-      opacity: .35;
-      animation: glowshift 8s ease-in-out infinite;
-      background: conic-gradient(from 0deg, #7c3aed, #2563eb, #059669, #d97706, #dc2626, #7c3aed);
-      z-index: 0;
-    }
-    @keyframes glowshift {
-      0%,100% { transform: scale(1) rotate(0deg); opacity: .35; }
-      50%      { transform: scale(1.15) rotate(180deg); opacity: .5; }
-    }
-
-    /* SVG plasma orb */
-    .orb-svg {
-      position: relative;
-      z-index: 1;
-      width: 100%;
-      height: 100%;
-      border-radius: 50%;
-      overflow: hidden;
-    }
-    .orb-svg svg { width: 100%; height: 100%; }
-
-    /* Blob morphing shape clipping the plasma */
-    .blob {
-      position: absolute;
-      inset: 0;
-      z-index: 2;
-      border-radius: 50%;
-      background: transparent;
-      box-shadow: inset 0 0 60px 20px var(--bg);
+      background: radial-gradient(circle, rgba(59,130,246,.28) 0%, rgba(99,102,241,.12) 50%, transparent 70%);
+      animation: ambient 6s ease-in-out infinite;
       pointer-events: none;
     }
-
-    /* Drag-over state */
-    .orb-wrap.drag-over .orb-glow { opacity: .75; transform: scale(1.1); }
-    .orb-wrap.drag-over .orb-svg  { filter: brightness(1.3) saturate(1.5); }
-
-    /* Processing state */
-    .orb-wrap.processing .orb-glow {
-      animation: glowshift 2s ease-in-out infinite;
+    @keyframes ambient {
+      0%,100% { transform: scale(1); opacity: .8; }
+      50%      { transform: scale(1.08); opacity: 1; }
     }
 
-    /* Done state — green pulse */
-    .orb-wrap.done .orb-glow {
-      background: radial-gradient(circle, #34d399, #059669);
-      animation: donepulse 1.5s ease-in-out infinite;
-    }
-    @keyframes donepulse {
-      0%,100% { opacity: .4; transform: scale(1); }
-      50%      { opacity: .7; transform: scale(1.2); }
+    /* Canvas sits inside */
+    #orb-canvas {
+      position: relative;
+      z-index: 1;
+      width: 280px;
+      height: 280px;
+      border-radius: 50%;
+      display: block;
+      pointer-events: none; /* let clicks/drag pass through to orb-wrap */
     }
 
-    /* ── Orb label ── */
+    /* Label below orb */
     .orb-label {
-      position: absolute;
-      inset: 0;
-      z-index: 3;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      pointer-events: none;
       text-align: center;
-      padding: 1.5rem;
+      margin-top: 1.1rem;
+      pointer-events: none;
     }
-    .orb-icon { font-size: 2.5rem; margin-bottom: .5rem; }
+    .orb-icon  { font-size: 1.4rem; margin-bottom: .3rem; line-height: 1; }
     .orb-title {
-      font-size: .95rem;
-      font-weight: 700;
-      color: rgba(255,255,255,.9);
-      text-shadow: 0 1px 8px rgba(0,0,0,.6);
+      font-size: .95rem; font-weight: 700;
+      color: rgba(255,255,255,.92);
     }
     .orb-sub {
-      font-size: .72rem;
-      color: rgba(255,255,255,.55);
-      margin-top: .25rem;
-      text-shadow: 0 1px 4px rgba(0,0,0,.5);
+      font-size: .75rem; color: rgba(255,255,255,.45);
+      margin-top: .2rem;
     }
     #orb-file-name {
-      font-size: .78rem;
-      color: rgba(255,255,255,.85);
-      margin-top: .4rem;
-      font-weight: 600;
-      text-shadow: 0 1px 6px rgba(0,0,0,.6);
-      word-break: break-all;
-      max-width: 180px;
+      font-size: .78rem; color: #93c5fd;
+      margin-top: .3rem; font-weight: 600;
+      word-break: break-all; max-width: 220px;
     }
     #file-input { display: none; }
 
     /* Format pills */
     .fmt-pills {
-      display: flex;
-      gap: .4rem;
-      flex-wrap: wrap;
-      justify-content: center;
-      margin-bottom: 2rem;
+      display: flex; gap: .4rem; flex-wrap: wrap;
+      justify-content: center; margin-bottom: 2rem;
     }
     .fmt-pill {
-      padding: .22rem .7rem;
-      border-radius: 999px;
-      font-size: .7rem;
-      font-weight: 600;
-      background: var(--surface);
-      color: var(--text-muted);
-      border: 1px solid var(--border);
-      transition: all .2s;
+      padding: .22rem .7rem; border-radius: 999px;
+      font-size: .7rem; font-weight: 600;
+      background: var(--surface); color: var(--text-muted);
+      border: 1px solid var(--border); transition: all .2s;
     }
     .fmt-pill.active {
-      background: rgba(139,92,246,.2);
-      color: #c4b5fd;
-      border-color: rgba(139,92,246,.4);
+      background: rgba(59,130,246,.18); color: #93c5fd;
+      border-color: rgba(59,130,246,.4);
     }
 
     /* ── Generate button ── */
     #generate-btn {
-      padding: .85rem 2.5rem;
-      border-radius: 999px;
-      background: linear-gradient(135deg, #7c3aed, #2563eb, #059669);
-      background-size: 200%;
-      animation: btnhue 4s linear infinite;
-      color: white;
-      border: none;
-      font-size: 1rem;
-      font-weight: 700;
+      position: relative;
+      padding: .85rem 2.5rem; border-radius: 999px;
+      background: linear-gradient(120deg,
+        #1a1060, #3b1fa8, #2563eb, #06b6d4,
+        #a78bfa, #e879f9, #60a5fa, #1a1060);
+      background-size: 300% 300%;
+      animation: orbflow 5s linear infinite;
+      color: white; border: none;
+      font-size: 1rem; font-weight: 700;
       cursor: pointer;
-      box-shadow: 0 4px 24px rgba(124,58,237,.4);
+      box-shadow: 0 0 0 1px rgba(167,139,250,.3),
+                  0 4px 28px rgba(99,60,240,.55),
+                  0 0 60px rgba(6,182,212,.15);
       transition: transform .15s, box-shadow .15s;
       margin-bottom: 2.5rem;
+      overflow: hidden;
+      letter-spacing: .01em;
+    }
+    /* shimmer sweep */
+    #generate-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(105deg,
+        transparent 35%, rgba(255,255,255,.18) 50%, transparent 65%);
+      background-size: 200% 100%;
+      animation: btnshimmer 2.8s ease-in-out infinite;
+      border-radius: inherit;
+      pointer-events: none;
+    }
+    /* sparkle dots */
+    #generate-btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(circle, rgba(255,255,255,.9) 1px, transparent 1px),
+        radial-gradient(circle, rgba(255,255,255,.6) 1px, transparent 1px),
+        radial-gradient(circle, rgba(255,255,255,.75) 1px, transparent 1px);
+      background-size: 60px 40px, 45px 55px, 80px 35px;
+      background-position: 10% 30%, 70% 60%, 40% 80%;
+      animation: sparkledrift 4s ease-in-out infinite alternate;
+      border-radius: inherit;
+      pointer-events: none;
+      opacity: .7;
     }
     #generate-btn:hover:not(:disabled) {
       transform: scale(1.04);
-      box-shadow: 0 6px 32px rgba(124,58,237,.6);
+      box-shadow: 0 0 0 1px rgba(167,139,250,.5),
+                  0 6px 40px rgba(99,60,240,.75),
+                  0 0 80px rgba(6,182,212,.25);
     }
-    #generate-btn:disabled { opacity: .4; cursor: not-allowed; animation: none; background: #444; }
-    @keyframes btnhue { to { background-position: 200% 0; } }
+    #generate-btn:disabled {
+      opacity: .4; cursor: not-allowed;
+      animation: none; background: #334155;
+    }
+    #generate-btn:disabled::before,
+    #generate-btn:disabled::after { display: none; }
+    @keyframes orbflow {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    @keyframes btnshimmer {
+      0%   { background-position: -100% 0; }
+      60%  { background-position: 200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    @keyframes sparkledrift {
+      0%   { background-position: 10% 30%, 70% 60%, 40% 80%; opacity: .5; }
+      100% { background-position: 20% 50%, 55% 30%, 70% 50%; opacity: .9; }
+    }
 
-    /* ── Main content area ── */
+    /* ── Content area ── */
     .content { max-width: 600px; margin: 0 auto; padding: 0 1rem 5rem; }
 
     /* ── Glass cards ── */
@@ -253,50 +252,11 @@
     .card-header {
       padding: .85rem 1.2rem;
       border-bottom: 1px solid var(--border);
-      font-size: .83rem;
-      font-weight: 700;
+      font-size: .83rem; font-weight: 700;
       color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: .07em;
+      text-transform: uppercase; letter-spacing: .07em;
     }
     .card-body { padding: 1.2rem; }
-
-    /* ── Auth ── */
-    #auth-modal {
-      display: none;
-      position: fixed; inset: 0; z-index: 100;
-      background: rgba(0,0,0,.7);
-      backdrop-filter: blur(8px);
-      align-items: center;
-      justify-content: center;
-    }
-    #auth-modal.open { display: flex; }
-    .auth-box {
-      background: #131320;
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      width: 100%; max-width: 380px;
-      margin: 1rem;
-      overflow: hidden;
-    }
-    .auth-tabs { display: flex; border-bottom: 1px solid var(--border); }
-    .auth-tab {
-      flex: 1; padding: .85rem;
-      text-align: center;
-      font-size: .85rem; font-weight: 600;
-      cursor: pointer;
-      color: var(--text-muted);
-      border-bottom: 2px solid transparent;
-      transition: all .15s;
-    }
-    .auth-tab.active { color: #a78bfa; border-bottom-color: #a78bfa; }
-    .auth-body { padding: 1.5rem; }
-    .auth-close {
-      position: absolute; top: 1rem; right: 1rem;
-      background: none; border: none; color: var(--text-muted);
-      font-size: 1.3rem; cursor: pointer; line-height: 1;
-    }
-    .auth-box { position: relative; }
 
     /* ── Forms ── */
     .form-row { display: flex; flex-direction: column; gap: .3rem; margin-bottom: .85rem; }
@@ -309,37 +269,25 @@
       outline: none; transition: border-color .2s, box-shadow .2s;
     }
     .form-row input:focus, .form-row select:focus {
-      border-color: #7c3aed;
-      box-shadow: 0 0 0 3px rgba(124,58,237,.2);
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(59,130,246,.2);
     }
-    .form-row select option { background: #131320; }
+    .form-row select option { background: #131e35; }
     .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: .85rem; }
-    details summary { cursor: pointer; font-size: .78rem; color: #a78bfa; user-select: none; padding: .35rem 0 0; }
+    details summary { cursor: pointer; font-size: .78rem; color: #60a5fa; user-select: none; padding: .35rem 0 0; }
     details[open] summary { margin-bottom: .8rem; }
     hr.divider { border: none; border-top: 1px solid var(--border); margin: .85rem 0; }
-
-    /* ── Auth submit ── */
-    .btn-auth {
-      width: 100%; padding: .8rem;
-      background: linear-gradient(135deg, #7c3aed, #2563eb);
-      color: white; border: none; border-radius: 8px;
-      font-size: .95rem; font-weight: 700;
-      cursor: pointer; margin-top: .75rem;
-    }
-    .btn-auth:disabled { opacity: .5; cursor: not-allowed; }
 
     /* ── Progress ── */
     #progress-section { display: none; margin-bottom: 1rem; }
     .progress-log { font-size: .8rem; color: var(--text-muted); line-height: 1.85; max-height: 180px; overflow-y: auto; }
     .log-line { display: flex; gap: .5rem; align-items: flex-start; }
-    .log-line.active { color: #a78bfa; }
+    .log-line.active { color: #60a5fa; }
     .log-line.done   { color: #34d399; }
     .spinner {
       width: .8rem; height: .8rem;
-      border: 2px solid var(--border);
-      border-top-color: #a78bfa;
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
+      border: 2px solid var(--border); border-top-color: #60a5fa;
+      border-radius: 50%; animation: spin .7s linear infinite;
       flex-shrink: 0; margin-top: .28rem;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -349,14 +297,11 @@
     #upgrade-section  { display: none; margin-bottom: 1rem; }
 
     .result-banner {
-      border-radius: var(--radius);
-      padding: 1.2rem;
-      text-align: center;
-      margin-bottom: .9rem;
+      border-radius: var(--radius); padding: 1.2rem;
+      text-align: center; margin-bottom: .9rem;
     }
     .result-banner.success { background: rgba(52,211,153,.1); border: 1px solid rgba(52,211,153,.25); }
     .result-banner.warning { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.25); }
-    .result-banner .icon { font-size: 2rem; margin-bottom: .4rem; }
     .result-banner h3 { font-size: 1rem; font-weight: 700; }
     .result-banner.success h3 { color: #34d399; }
     .result-banner.warning h3 { color: #f59e0b; }
@@ -367,8 +312,7 @@
       width: 100%; padding: .8rem;
       background: linear-gradient(135deg, #059669, #0891b2);
       color: white; border: none; border-radius: 8px;
-      font-size: .9rem; font-weight: 700;
-      cursor: pointer; text-decoration: none;
+      font-size: .9rem; font-weight: 700; cursor: pointer; text-decoration: none;
     }
     .btn-upgrade {
       width: 100%; padding: .8rem;
@@ -394,117 +338,57 @@
 </head>
 <body>
 
-<!-- Auth modal (overlay) -->
-<div id="auth-modal">
-  <div class="auth-box">
-    <button class="auth-close" onclick="closeAuth()">×</button>
-    <div class="auth-tabs">
-      <div class="auth-tab active" id="tab-login"    onclick="switchTab('login')">Sign in</div>
-      <div class="auth-tab"        id="tab-register" onclick="switchTab('register')">Create account</div>
-    </div>
-    <div class="auth-body">
-      <div id="auth-error" class="error-inline"></div>
-      <div class="form-row">
-        <label>Email</label>
-        <input type="email" id="auth-email" placeholder="you@medschool.edu" />
-      </div>
-      <div class="form-row">
-        <label>Password</label>
-        <input type="password" id="auth-password" placeholder="••••••••" />
-      </div>
-      <button class="btn-auth" id="auth-submit-btn" onclick="submitAuth()">Sign in</button>
-      <p style="text-align:center;font-size:.72rem;color:var(--text-muted);margin-top:.8rem">
-        Free: 3 lectures/month · No credit card needed
-      </p>
-    </div>
-  </div>
+<!-- Capacity banner -->
+<div id="capacity-banner">
+  DarwinCards has hit its monthly limit. Check back next month.
 </div>
 
 <!-- Top bar -->
 <div class="topbar">
   <div class="logo">DarwinCards</div>
-  <div class="topbar-right" id="topbar-right">
-    <button class="tb-btn ghost" onclick="openAuth('login')">Log in</button>
-    <button class="tb-btn filled" onclick="openAuth('register')">Sign up free</button>
+  <div class="topbar-right">
+    <span class="tb-tag">Free to use</span>
   </div>
 </div>
 
-<!-- Hero + orb -->
+<!-- Hero -->
 <div class="hero">
-  <h1 class="hero-title">Drop your lecture.<br>Get Anki cards.</h1>
-  <p class="hero-sub">Upload a file and AI builds your deck in seconds.</p>
+  <h1 class="hero-title">Personalized Anki cards<br>built from your lectures.</h1>
+  <p class="hero-sub">Upload your transcript, PDF slides, or PowerPoint — AI reads your material and builds a study deck tailored to what you actually need to learn.</p>
 
-  <!-- The orb -->
+  <!-- Orb -->
   <div class="orb-wrap" id="orb"
        onclick="document.getElementById('file-input').click()"
        ondragover="orbDragOver(event)"
        ondragleave="orbDragLeave(event)"
        ondrop="orbDrop(event)">
 
-    <div class="orb-glow"></div>
+    <div class="orb-ambient" id="orb-ambient"></div>
+    <canvas id="orb-canvas" width="280" height="280"></canvas>
 
-    <!-- SVG plasma using feTurbulence -->
-    <div class="orb-svg">
-      <svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <filter id="plasma" x="-10%" y="-10%" width="120%" height="120%">
-            <feTurbulence type="turbulence" baseFrequency="0.012 0.012" numOctaves="4" seed="2" result="turb">
-              <animate attributeName="baseFrequency" values="0.012 0.012;0.018 0.015;0.012 0.012" dur="8s" repeatCount="indefinite"/>
-              <animate attributeName="seed" values="2;8;15;2" dur="12s" repeatCount="indefinite"/>
-            </feTurbulence>
-            <feColorMatrix type="hueRotate" values="0" result="hue">
-              <animate attributeName="values" from="0" to="360" dur="6s" repeatCount="indefinite"/>
-            </feColorMatrix>
-            <feColorMatrix type="saturate" values="3" result="sat"/>
-            <feBlend in="sat" in2="SourceGraphic" mode="screen"/>
-          </filter>
-          <radialGradient id="sphereGrad" cx="40%" cy="35%" r="60%">
-            <stop offset="0%"   stop-color="rgba(255,255,255,.25)"/>
-            <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
-          </radialGradient>
-          <clipPath id="circle-clip">
-            <circle cx="150" cy="150" r="148"/>
-          </clipPath>
-        </defs>
-        <!-- Plasma fill -->
-        <rect x="0" y="0" width="300" height="300" fill="#000" clip-path="url(#circle-clip)"/>
-        <rect x="0" y="0" width="300" height="300" filter="url(#plasma)" clip-path="url(#circle-clip)"/>
-        <!-- Sphere sheen -->
-        <circle cx="150" cy="150" r="148" fill="url(#sphereGrad)"/>
-        <!-- Thin border -->
-        <circle cx="150" cy="150" r="148" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="1.5"/>
-      </svg>
-    </div>
+    <input type="file" id="file-input" accept=".txt,.pdf,.pptx,.ppt" />
+  </div>
 
-    <div class="blob"></div>
-
-    <!-- Label overlay -->
-    <div class="orb-label" id="orb-label">
-      <div class="orb-icon" id="orb-icon">📂</div>
-      <div class="orb-title" id="orb-title">Drop your lecture here</div>
-      <div class="orb-sub"  id="orb-sub">or click to browse</div>
-      <div id="orb-file-name"></div>
-    </div>
-
-    <input type="file" id="file-input" accept=".mp4,.mov,.mkv,.avi,.m4v,.webm,.mp3,.m4a,.wav,.ogg,.txt,.pdf,.pptx,.ppt" />
+  <div class="orb-label">
+    <div class="orb-icon" id="orb-icon">↑</div>
+    <div class="orb-title" id="orb-title">Drop your lecture here</div>
+    <div class="orb-sub"  id="orb-sub">or click to browse</div>
+    <div id="orb-file-name"></div>
   </div>
 
   <!-- Format pills -->
   <div class="fmt-pills">
-    <span class="fmt-pill video">🎬 Video</span>
-    <span class="fmt-pill audio">🎵 Audio</span>
-    <span class="fmt-pill txt">📄 Transcript</span>
-    <span class="fmt-pill pdf">📑 PDF Slides</span>
-    <span class="fmt-pill pptx">📊 PowerPoint</span>
+    <span class="fmt-pill txt">Transcript (.txt)</span>
+    <span class="fmt-pill pdf">PDF Slides</span>
+    <span class="fmt-pill pptx">PowerPoint</span>
   </div>
 
-  <button id="generate-btn" onclick="startGeneration()">✨ Generate My Anki Cards</button>
+  <button id="generate-btn" onclick="startGeneration()">Generate My Anki Cards</button>
 </div>
 
 <!-- Content -->
 <div class="content">
 
-  <!-- Progress -->
   <div id="progress-section">
     <div class="card">
       <div class="card-header">Generating your cards…</div>
@@ -514,43 +398,37 @@
     </div>
   </div>
 
-  <!-- Download -->
   <div id="download-section">
     <div class="card">
       <div class="card-body">
         <div class="result-banner success">
-          <div class="icon">✅</div>
           <h3>Your deck is ready</h3>
           <p>Double-click the .apkg to import into Anki</p>
         </div>
-        <a id="download-btn" class="btn-download" href="#" download>⬇ Download .apkg Deck</a>
+        <a id="download-btn" class="btn-download" href="#" download>Download .apkg Deck</a>
         <button class="btn-ghost" onclick="restart()">Generate another deck</button>
       </div>
     </div>
   </div>
 
-  <!-- Upgrade -->
-  <div id="upgrade-section">
+  <div id="limit-section" style="display:none;margin-bottom:1rem;">
     <div class="card">
       <div class="card-body">
         <div class="result-banner warning">
-          <div class="icon">⚡</div>
-          <h3>Monthly limit reached</h3>
-          <p>You've used all 3 free lectures this month. Upgrade for unlimited.</p>
+          <h3 id="limit-title">Limit reached</h3>
+          <p id="limit-msg">Please try again later.</p>
         </div>
-        <button class="btn-upgrade" onclick="doUpgrade()">Upgrade to Pro — $9 / month</button>
-        <button class="btn-ghost" onclick="document.getElementById('upgrade-section').style.display='none'">Maybe later</button>
+        <button class="btn-ghost" onclick="document.getElementById('limit-section').style.display='none'">Dismiss</button>
       </div>
     </div>
   </div>
 
-  <!-- Options -->
   <div class="card">
     <div class="card-header">Card Options</div>
     <div class="card-body">
       <div class="form-row">
         <label>Deck Name</label>
-        <input type="text" id="deck-name" value="DarwinCards Deck" placeholder="e.g. Cardiology Week 3" />
+        <input type="text" id="deck-name" value="DarwinCards" placeholder="e.g. DarwinCards" />
       </div>
       <div class="two-col">
         <div class="form-row">
@@ -598,238 +476,375 @@
 </div>
 
 <script>
-  let token = localStorage.getItem('dc_token') || null;
-  let userInfo = null, selectedFile = null, eventSource = null, logLines = [], authMode = 'login';
+// ─────────────────────────────────────────────
+// Status check on load
+// ─────────────────────────────────────────────
+window.addEventListener('load', async () => {
+  try {
+    const r = await fetch('/api/status');
+    if (r.ok) {
+      const s = await r.json();
+      if (s.at_capacity) {
+        document.getElementById('capacity-banner').style.display = 'block';
+        document.getElementById('generate-btn').disabled = true;
+      }
+    }
+  } catch (_) {}
+});
 
-  const VIDEO_EXTS = new Set(['.mp4','.mov','.mkv','.avi','.m4v','.webm']);
-  const AUDIO_EXTS = new Set(['.mp3','.m4a','.wav','.ogg']);
-  const FILE_META = {
-    video: { icon: '🎬', label: 'Video loaded',        sub: 'Ready to transcribe', badge: 'video' },
-    audio: { icon: '🎵', label: 'Audio loaded',        sub: 'Ready to transcribe', badge: 'audio' },
-    txt:   { icon: '📄', label: 'Transcript loaded',   sub: 'Ready to generate',   badge: 'txt'   },
-    pdf:   { icon: '📑', label: 'PDF slides loaded',   sub: 'Ready to generate',   badge: 'pdf'   },
-    pptx:  { icon: '📊', label: 'Slides loaded',       sub: 'Ready to generate',   badge: 'pptx'  },
+// ─────────────────────────────────────────────
+// Fluid Orb — WebGL2 shader renderer
+// ─────────────────────────────────────────────
+(function initOrb() {
+  const canvas = document.getElementById('orb-canvas');
+  const CSS_W = 280, CSS_H = 280;
+
+  const gl = canvas.getContext('webgl2', {
+    alpha: true, antialias: false, premultipliedAlpha: false,
+    powerPreference: 'high-performance'
+  });
+  if (!gl) return;
+
+  const vertex = `#version 300 es
+    in vec2 position;
+    void main() { gl_Position = vec4(position, 0.0, 1.0); }
+  `;
+
+  const fragment = `#version 300 es
+    precision highp float;
+    out vec4 outColor;
+    uniform vec2 uResolution;
+    uniform vec2 uPointer;
+    uniform float uTime;
+    uniform float uPress;
+    uniform float uPulse;
+
+    #define PI 3.14159265359
+
+    float hash31(vec3 p) {
+      p = fract(p * .1031);
+      p += dot(p, p.yzx + 33.33);
+      return fract((p.x + p.y) * p.z);
+    }
+
+    float noise3(vec3 p) {
+      vec3 i = floor(p), f = fract(p);
+      f = f * f * (3.0 - 2.0 * f);
+      return mix(
+        mix(mix(hash31(i), hash31(i + vec3(1,0,0)), f.x),
+            mix(hash31(i + vec3(0,1,0)), hash31(i + vec3(1,1,0)), f.x), f.y),
+        mix(mix(hash31(i + vec3(0,0,1)), hash31(i + vec3(1,0,1)), f.x),
+            mix(hash31(i + vec3(0,1,1)), hash31(i + vec3(1,1,1)), f.x), f.y), f.z);
+    }
+
+    float fbm(vec3 p) {
+      float value = 0.0, amp = .54;
+      mat3 rot = mat3(.00, .80, .60, -.80, .36, -.48, -.60, -.48, .64);
+      for (int i = 0; i < 5; i++) {
+        value += amp * noise3(p);
+        p = rot * p * 2.03 + 2.17;
+        amp *= .49;
+      }
+      return value;
+    }
+
+    vec3 palette(float t) {
+      vec3 a = vec3(.48, .46, .53);
+      vec3 b = vec3(.48, .44, .48);
+      vec3 c = vec3(1.00, .82, .68);
+      vec3 d = vec3(.12, .28, .58);
+      return a + b * cos(2.0 * PI * (c * t + d));
+    }
+
+    void main() {
+      vec2 frag = gl_FragCoord.xy;
+      vec2 uv    = (2.0 * frag - uResolution) / min(uResolution.x, uResolution.y);
+      vec2 mouse = (2.0 * uPointer - uResolution) / min(uResolution.x, uResolution.y);
+      mouse.y *= -1.0;
+
+      float t = uTime * .22;
+      float mouseDistance = length(uv - mouse);
+      float influence = exp(-mouseDistance * 2.6);
+      vec2 pull = (mouse - uv) * influence * (.085 + .07 * uPress);
+      vec2 p = uv - pull;
+
+      float angle  = atan(p.y, p.x);
+      float organic = noise3(vec3(cos(angle) * 2.2, sin(angle) * 2.2, t * .7));
+      float radius  = .585 + (organic - .5) * .025 + uPress * .018 * influence;
+      float d       = length(p);
+      float edge    = smoothstep(radius + .008, radius - .018, d);
+
+      vec3 sphere;
+      vec2 q  = p / max(radius, .001);
+      float z = sqrt(max(0.0, 1.0 - dot(q, q)));
+      vec3 normal = normalize(vec3(q, z));
+
+      vec3 flowPos = normal * 2.35;
+      flowPos.xy  += mouse * .42;
+      flowPos     += vec3(t * .38, -t * .27, t * .21);
+      float n1     = fbm(flowPos);
+      float n2     = fbm(flowPos * 1.58 + vec3(4.2, -1.7, 2.6) - t * .3);
+      float ribbons = sin((n1 * 2.2 + n2 * .9 + normal.y * .55 + t * .14) * 7.0) * .5 + .5;
+      float field   = n1 * .66 + n2 * .34 + ribbons * .18;
+
+      sphere  = palette(field + t * .055 + influence * .11);
+      sphere *= .7 + 1.05 * pow(n1, 1.7);
+      sphere += palette(field + .28) * pow(ribbons, 5.0) * .55;
+
+      vec3 lightDir = normalize(vec3(-.38, .55, .74));
+      float diffuse = max(dot(normal, lightDir), 0.0);
+      float fresnel = pow(1.0 - max(normal.z, 0.0), 3.2);
+      float spec    = pow(max(dot(reflect(-lightDir, normal), vec3(0,0,1)), 0.0), 42.0);
+      sphere *= .56 + diffuse * .6;
+      sphere += vec3(.65, .8, 1.0) * fresnel * .68;
+      sphere += vec3(1.0, .78, .96) * spec * 1.4;
+
+      float pulseRing = exp(-abs(d - (.16 + uPulse * .55)) * 48.0) * (1.0 - uPulse);
+      sphere += vec3(.55, .8, 1.0) * pulseRing * .55;
+
+      float halo  = exp(-max(d - radius, 0.0) * 13.0) * smoothstep(radius + .35, radius, d);
+      vec3 color  = sphere * edge;
+      color      += palette(t * .05 + angle / PI / 5.0) * halo * .20;
+      color      += vec3(.30, .12, .8) * pow(halo, 2.0) * .22;
+
+      float alpha = max(edge, halo * .72);
+      alpha *= smoothstep(1.12, .94, d);
+      outColor = vec4(color, alpha);
+    }
+  `;
+
+  const compile = (type, src) => {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.error(gl.getShaderInfoLog(s)); return null; }
+    return s;
   };
 
-  window.addEventListener('load', async () => {
-    if (token) await loadUser(); else updateTopbar(null);
-    const p = new URLSearchParams(window.location.search);
-    if (p.get('upgraded') === '1') {
-      await loadUser();
-      alert('🎉 Welcome to Pro! Unlimited lectures are now yours.');
-      window.history.replaceState({}, '', '/');
-    }
-  });
+  const prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER,   vertex));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fragment));
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { console.error(gl.getProgramInfoLog(prog)); return; }
+  gl.useProgram(prog);
 
-  async function loadUser() {
-    try {
-      const r = await apiFetch('/api/auth/me');
-      if (!r.ok) throw 0;
-      userInfo = await r.json();
-      updateTopbar(userInfo);
-    } catch { token = null; localStorage.removeItem('dc_token'); updateTopbar(null); }
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+  const posLoc = gl.getAttribLocation(prog, 'position');
+  gl.enableVertexAttribArray(posLoc);
+  gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+  const uniforms = Object.fromEntries(
+    ['uResolution','uPointer','uTime','uPress','uPulse'].map(n => [n, gl.getUniformLocation(prog, n)])
+  );
+
+  const pointer = { x: CSS_W*.5, y: CSS_H*.5, tx: CSS_W*.5, ty: CSS_H*.5 };
+  let press = 0, targetPress = 0, pulse = 1, start = performance.now();
+
+  function setSize() {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    canvas.width  = Math.round(CSS_W * dpr);
+    canvas.height = Math.round(CSS_H * dpr);
+    gl.viewport(0, 0, canvas.width, canvas.height);
   }
 
-  function updateTopbar(u) {
-    const el = document.getElementById('topbar-right');
-    if (!u) {
-      el.innerHTML = `<button class="tb-btn ghost" onclick="openAuth('login')">Log in</button>
-                      <button class="tb-btn filled" onclick="openAuth('register')">Sign up free</button>`;
-    } else {
-      const rem = u.plan === 'pro' ? '∞' : Math.max(0, 3 - u.usage_this_month) + ' left';
-      const planBadge = `<span class="tb-plan ${u.plan}">${u.plan === 'pro' ? '⭐ Pro' : 'Free'}</span>`;
-      const upgradeBtn = (u.plan === 'free' && u.usage_this_month >= 3)
-        ? `<button class="tb-upgrade" onclick="doUpgrade()">Upgrade</button>` : '';
-      el.innerHTML = `<span class="tb-user">${u.email} ${planBadge} <span style="opacity:.5;font-size:.7rem">${rem}</span></span>
-                      ${upgradeBtn}
-                      <button class="tb-signout" onclick="doLogout()">Sign out</button>`;
-    }
+  function locate(e) {
+    const rect = canvas.getBoundingClientRect();
+    pointer.tx = e.clientX - rect.left;
+    pointer.ty = e.clientY - rect.top;
   }
 
-  // Auth modal
-  function openAuth(mode) { authMode = mode; switchTab(mode); document.getElementById('auth-modal').classList.add('open'); }
-  function closeAuth() { document.getElementById('auth-modal').classList.remove('open'); }
-  document.getElementById('auth-modal').addEventListener('click', e => { if (e.target === document.getElementById('auth-modal')) closeAuth(); });
+  // Route pointer events through orb-wrap (canvas has pointer-events:none)
+  const orbEl = document.getElementById('orb');
+  orbEl.addEventListener('pointermove',   e  => locate(e),                    { passive: true });
+  orbEl.addEventListener('pointerdown',   e  => { locate(e); targetPress = 1; pulse = 0; });
+  orbEl.addEventListener('pointerup',     () => { targetPress = 0; });
+  orbEl.addEventListener('pointercancel', () => { targetPress = 0; });
+  orbEl.addEventListener('pointerleave',  () => { targetPress = 0; pointer.tx = CSS_W*.5; pointer.ty = CSS_H*.5; });
 
-  function switchTab(mode) {
-    authMode = mode;
-    document.getElementById('tab-login').classList.toggle('active',    mode === 'login');
-    document.getElementById('tab-register').classList.toggle('active', mode === 'register');
-    document.getElementById('auth-submit-btn').textContent = mode === 'login' ? 'Sign in' : 'Create account';
-    document.getElementById('auth-error').style.display = 'none';
+  setSize();
+  addEventListener('resize', setSize, { passive: true });
+
+  function draw(now) {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    pointer.x += (pointer.tx - pointer.x) * .075;
+    pointer.y += (pointer.ty - pointer.y) * .075;
+    press  += (targetPress - press) * .1;
+    pulse   = Math.min(1, pulse + .018);
+
+    gl.uniform2f(uniforms.uResolution, canvas.width, canvas.height);
+    gl.uniform2f(uniforms.uPointer,    pointer.x * dpr, pointer.y * dpr);
+    gl.uniform1f(uniforms.uTime,       (now - start) / 1000);
+    gl.uniform1f(uniforms.uPress,      press);
+    gl.uniform1f(uniforms.uPulse,      pulse);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    requestAnimationFrame(draw);
   }
+  requestAnimationFrame(draw);
+})();
 
-  async function submitAuth() {
-    const email = document.getElementById('auth-email').value.trim();
-    const pwd   = document.getElementById('auth-password').value;
-    if (!email || !pwd) { showAuthErr('Fill in all fields.'); return; }
-    const btn = document.getElementById('auth-submit-btn');
-    btn.disabled = true; btn.textContent = authMode === 'login' ? 'Signing in…' : 'Creating account…';
-    try {
-      let res, data;
-      if (authMode === 'register') {
-        res = await fetch('/api/auth/register', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, password: pwd }) });
-      } else {
-        res = await fetch('/api/auth/login', { method:'POST', body: new URLSearchParams({ username: email, password: pwd }) });
-      }
-      data = await res.json();
-      if (!res.ok) { showAuthErr(data.detail || 'Something went wrong.'); return; }
-      token = data.access_token;
-      localStorage.setItem('dc_token', token);
-      await loadUser();
-      closeAuth();
-    } catch { showAuthErr('Network error.'); }
-    finally { btn.disabled = false; btn.textContent = authMode === 'login' ? 'Sign in' : 'Create account'; }
+// ─────────────────────────────────────────────
+// Orb state helpers
+// ─────────────────────────────────────────────
+function setOrbState(state) {
+  const amb = document.getElementById('orb-ambient');
+  if (state === 'processing') {
+    amb.style.background = 'radial-gradient(circle, rgba(99,102,241,.5) 0%, rgba(59,130,246,.2) 50%, transparent 70%)';
+    amb.style.animation = 'ambient 2s ease-in-out infinite';
+  } else if (state === 'done') {
+    amb.style.background = 'radial-gradient(circle, rgba(52,211,153,.4) 0%, rgba(5,150,105,.15) 50%, transparent 70%)';
+    amb.style.animation = 'ambient 1.5s ease-in-out infinite';
+  } else {
+    amb.style.background = '';
+    amb.style.animation = '';
   }
+}
 
-  function showAuthErr(msg) { const e = document.getElementById('auth-error'); e.textContent = msg; e.style.display = 'block'; }
-  function doLogout() { token = null; userInfo = null; localStorage.removeItem('dc_token'); updateTopbar(null); }
-  async function doUpgrade() {
-    try { const r = await apiFetch('/api/billing/checkout', {method:'POST'}); const d = await r.json(); if (d.url) window.location.href = d.url; }
-    catch { alert('Could not start checkout.'); }
-  }
+// ─────────────────────────────────────────────
+// App logic
+// ─────────────────────────────────────────────
+let selectedFile = null, eventSource = null, logLines = [];
 
-  // Orb interactions
-  function orbDragOver(e) { e.preventDefault(); document.getElementById('orb').classList.add('drag-over'); }
-  function orbDragLeave(e) { document.getElementById('orb').classList.remove('drag-over'); }
-  function orbDrop(e) {
-    e.preventDefault();
-    document.getElementById('orb').classList.remove('drag-over');
-    if (e.dataTransfer.files[0]) selectFile(e.dataTransfer.files[0]);
-  }
+const FILE_META = {
+  txt:  { icon: 'A', label: 'Transcript loaded', sub: 'Ready to generate', badge: 'txt'  },
+  pdf:  { icon: 'P', label: 'PDF loaded',        sub: 'Ready to generate', badge: 'pdf'  },
+  pptx: { icon: 'S', label: 'Slides loaded',     sub: 'Ready to generate', badge: 'pptx' },
+};
 
-  document.getElementById('file-input').addEventListener('change', e => { if (e.target.files[0]) selectFile(e.target.files[0]); });
+function orbDragOver(e)  { e.preventDefault(); document.getElementById('orb').style.transform = 'scale(1.04)'; }
+function orbDragLeave(e) { document.getElementById('orb').style.transform = ''; }
+function orbDrop(e) {
+  e.preventDefault(); document.getElementById('orb').style.transform = '';
+  if (e.dataTransfer.files[0]) selectFile(e.dataTransfer.files[0]);
+}
 
-  function getType(name) {
-    const ext = '.' + name.split('.').pop().toLowerCase();
-    if (VIDEO_EXTS.has(ext)) return 'video'; if (AUDIO_EXTS.has(ext)) return 'audio';
-    if (ext === '.txt') return 'txt'; if (ext === '.pdf') return 'pdf'; return 'pptx';
-  }
+document.getElementById('file-input').addEventListener('change', e => { if (e.target.files[0]) selectFile(e.target.files[0]); });
 
-  function selectFile(file) {
-    selectedFile = file;
-    const meta = FILE_META[getType(file.name)];
-    document.getElementById('orb-icon').textContent  = meta.icon;
-    document.getElementById('orb-title').textContent = meta.label;
-    document.getElementById('orb-sub').textContent   = `${(file.size/1024/1024).toFixed(1)} MB`;
-    document.getElementById('orb-file-name').textContent = file.name;
-    document.querySelectorAll('.fmt-pill').forEach(p => p.classList.remove('active'));
-    document.querySelector(`.fmt-pill.${meta.badge}`)?.classList.add('active');
-  }
+function getType(name) {
+  const ext = '.' + name.split('.').pop().toLowerCase();
+  if (ext === '.txt') return 'txt';
+  if (ext === '.pdf') return 'pdf';
+  return 'pptx';
+}
 
-  function setOrbState(state) {
-    const orb = document.getElementById('orb');
-    orb.classList.remove('drag-over','processing','done');
-    if (state) orb.classList.add(state);
-  }
+function selectFile(file) {
+  selectedFile = file;
+  const meta = FILE_META[getType(file.name)];
+  document.getElementById('orb-icon').textContent  = meta.icon;
+  document.getElementById('orb-title').textContent = meta.label;
+  document.getElementById('orb-sub').textContent   = `${(file.size/1024/1024).toFixed(1)} MB`;
+  document.getElementById('orb-file-name').textContent = file.name;
+  document.querySelectorAll('.fmt-pill').forEach(p => p.classList.remove('active'));
+  document.querySelector(`.fmt-pill.${meta.badge}`)?.classList.add('active');
+}
 
-  async function startGeneration() {
-    if (!token) { openAuth('login'); return; }
-    if (!selectedFile) { alert('Drop a file into the orb first.'); return; }
-    if (userInfo?.plan === 'free' && !userInfo.can_generate) {
-      document.getElementById('upgrade-section').style.display = 'block';
-      document.getElementById('upgrade-section').scrollIntoView({behavior:'smooth'});
+async function startGeneration() {
+  if (!selectedFile) { alert('Drop a file into the orb first.'); return; }
+
+  document.getElementById('generate-btn').disabled = true;
+  document.getElementById('download-section').style.display = 'none';
+  document.getElementById('limit-section').style.display    = 'none';
+  document.getElementById('progress-section').style.display = 'block';
+  logLines = []; renderLog();
+  setOrbState('processing');
+  document.getElementById('orb-icon').textContent  = '···';
+  document.getElementById('orb-title').textContent = 'Generating…';
+  document.getElementById('orb-sub').textContent   = 'Sit tight';
+
+  const fd = new FormData();
+  fd.append('file',            selectedFile);
+  fd.append('deck_name',       document.getElementById('deck-name').value || 'DarwinCards');
+  fd.append('card_type',       document.getElementById('card-type').value);
+  fd.append('cards_per_chunk', document.getElementById('cards-per-chunk').value);
+  fd.append('language',        document.getElementById('language').value || 'en');
+  fd.append('claude_model',    document.getElementById('claude-model').value);
+  fd.append('tags',            document.getElementById('tags').value);
+
+  let jobId;
+  try {
+    const res = await fetch('/api/generate', { method: 'POST', body: fd });
+    const data = await res.json().catch(() => ({}));
+
+    if (res.status === 429) {
+      // Per-IP daily limit
+      showLimit('Daily limit reached', data.detail || 'You can generate up to 5 decks per day. Check back tomorrow.');
       return;
     }
-    document.getElementById('generate-btn').disabled = true;
-    document.getElementById('download-section').style.display = 'none';
-    document.getElementById('upgrade-section').style.display  = 'none';
-    document.getElementById('progress-section').style.display = 'block';
-    logLines = []; renderLog();
-    setOrbState('processing');
-    document.getElementById('orb-icon').textContent  = '⚡';
-    document.getElementById('orb-title').textContent = 'Generating…';
-    document.getElementById('orb-sub').textContent   = 'Sit tight';
+    if (res.status === 503) {
+      // Global monthly cap
+      document.getElementById('capacity-banner').style.display = 'block';
+      showLimit('Service at capacity', data.detail || 'DarwinCards has hit its monthly limit. Check back next month.');
+      return;
+    }
+    if (!res.ok) throw new Error(data.detail || 'Upload failed');
+    jobId = data.job_id;
+  } catch (err) { showErr(err.message); return; }
 
-    const fd = new FormData();
-    fd.append('file',            selectedFile);
-    fd.append('deck_name',       document.getElementById('deck-name').value || 'DarwinCards Deck');
-    fd.append('card_type',       document.getElementById('card-type').value);
-    fd.append('cards_per_chunk', document.getElementById('cards-per-chunk').value);
-    fd.append('language',        document.getElementById('language').value || 'en');
-    fd.append('claude_model',    document.getElementById('claude-model').value);
-    fd.append('tags',            document.getElementById('tags').value);
+  eventSource = new EventSource(`/api/progress/${jobId}`);
+  eventSource.onmessage = e => {
+    const msg = e.data;
+    if (msg.startsWith('__DONE__')) {
+      eventSource.close(); markLastDone();
+      setOrbState('done');
+      document.getElementById('orb-icon').textContent  = '✓';
+      document.getElementById('orb-title').textContent = 'Deck ready!';
+      document.getElementById('orb-sub').textContent   = 'Download below';
+      document.getElementById('orb-file-name').textContent = '';
+      document.getElementById('progress-section').style.display = 'none';
+      document.getElementById('download-btn').href = `/api/download/${jobId}`;
+      document.getElementById('download-section').style.display = 'block';
+      document.getElementById('download-section').scrollIntoView({behavior:'smooth'});
+      document.getElementById('generate-btn').disabled = false;
+    } else if (msg.startsWith('__ERROR__')) {
+      eventSource.close(); showErr(msg.replace('__ERROR__',''));
+    } else {
+      addLog(msg);
+    }
+  };
+  eventSource.onerror = () => eventSource.close();
+}
 
-    let jobId;
-    try {
-      const res = await apiFetch('/api/generate', {method:'POST', body: fd});
-      if (res.status === 402) {
-        setOrbState(null); resetOrbLabel();
-        document.getElementById('progress-section').style.display = 'none';
-        document.getElementById('upgrade-section').style.display  = 'block';
-        document.getElementById('generate-btn').disabled = false;
-        return;
-      }
-      if (!res.ok) { const t = await res.json(); throw new Error(t.detail || 'Upload failed'); }
-      jobId = (await res.json()).job_id;
-    } catch (err) { showErr(err.message); return; }
+function showLimit(title, msg) {
+  setOrbState(null); resetOrbLabel();
+  document.getElementById('progress-section').style.display = 'none';
+  document.getElementById('limit-title').textContent = title;
+  document.getElementById('limit-msg').textContent   = msg;
+  document.getElementById('limit-section').style.display = 'block';
+  document.getElementById('limit-section').scrollIntoView({behavior:'smooth'});
+  document.getElementById('generate-btn').disabled = false;
+}
 
-    eventSource = new EventSource(`/api/progress/${jobId}`);
-    eventSource.onmessage = e => {
-      const msg = e.data;
-      if (msg.startsWith('__DONE__')) {
-        eventSource.close(); markLastDone();
-        setOrbState('done');
-        document.getElementById('orb-icon').textContent  = '✅';
-        document.getElementById('orb-title').textContent = 'Deck ready!';
-        document.getElementById('orb-sub').textContent   = 'Download below';
-        document.getElementById('orb-file-name').textContent = '';
-        document.getElementById('progress-section').style.display = 'none';
-        document.getElementById('download-btn').href = `/api/download/${jobId}`;
-        document.getElementById('download-section').style.display = 'block';
-        document.getElementById('download-section').scrollIntoView({behavior:'smooth'});
-        document.getElementById('generate-btn').disabled = false;
-        loadUser();
-      } else if (msg.startsWith('__ERROR__')) {
-        eventSource.close(); showErr(msg.replace('__ERROR__',''));
-      } else {
-        addLog(msg);
-      }
-    };
-    eventSource.onerror = () => eventSource.close();
-  }
-
-  function addLog(msg) { if (logLines.length) logLines[logLines.length-1].done = true; logLines.push({text:msg,done:false}); renderLog(); }
-  function markLastDone() { if (logLines.length) logLines[logLines.length-1].done = true; renderLog(); }
-  function renderLog() {
-    const el = document.getElementById('progress-log');
-    el.innerHTML = logLines.map(l => l.done
-      ? `<div class="log-line done"><span>✓</span><span>${l.text}</span></div>`
-      : `<div class="log-line active"><span class="spinner"></span><span>${l.text}</span></div>`
-    ).join('');
-    el.scrollTop = el.scrollHeight;
-  }
-  function showErr(msg) {
-    document.getElementById('progress-log').innerHTML += `<div class="error-inline">✗ ${msg}</div>`;
-    setOrbState(null); resetOrbLabel();
-    document.getElementById('generate-btn').disabled = false;
-  }
-  function resetOrbLabel() {
-    document.getElementById('orb-icon').textContent  = '📂';
-    document.getElementById('orb-title').textContent = 'Drop your lecture here';
-    document.getElementById('orb-sub').textContent   = 'or click to browse';
-    document.getElementById('orb-file-name').textContent = '';
-  }
-  function restart() {
-    selectedFile = null;
-    document.getElementById('download-section').style.display = 'none';
-    document.getElementById('progress-section').style.display = 'none';
-    setOrbState(null); resetOrbLabel();
-    document.querySelectorAll('.fmt-pill').forEach(p => p.classList.remove('active'));
-    logLines = [];
-  }
-
-  function apiFetch(url, opts = {}) {
-    opts.headers = opts.headers || {};
-    if (token && !(opts.body instanceof FormData)) opts.headers['Content-Type'] = 'application/json';
-    if (token) opts.headers['Authorization'] = `Bearer ${token}`;
-    return fetch(url, opts);
-  }
-
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && document.getElementById('auth-modal').classList.contains('open')) submitAuth();
-    if (e.key === 'Escape') closeAuth();
-  });
+function addLog(msg)    { if (logLines.length) logLines[logLines.length-1].done = true; logLines.push({text:msg,done:false}); renderLog(); }
+function markLastDone() { if (logLines.length) logLines[logLines.length-1].done = true; renderLog(); }
+function renderLog() {
+  const el = document.getElementById('progress-log');
+  el.innerHTML = logLines.map(l => l.done
+    ? `<div class="log-line done"><span>✓</span><span>${l.text}</span></div>`
+    : `<div class="log-line active"><span class="spinner"></span><span>${l.text}</span></div>`
+  ).join('');
+  el.scrollTop = el.scrollHeight;
+}
+function showErr(msg) {
+  document.getElementById('progress-log').innerHTML += `<div class="error-inline">Error: ${msg}</div>`;
+  setOrbState(null); resetOrbLabel();
+  document.getElementById('generate-btn').disabled = false;
+}
+function resetOrbLabel() {
+  document.getElementById('orb-icon').textContent  = '↑';
+  document.getElementById('orb-title').textContent = 'Drop your lecture here';
+  document.getElementById('orb-sub').textContent   = 'or click to browse';
+  document.getElementById('orb-file-name').textContent = '';
+}
+function restart() {
+  selectedFile = null;
+  document.getElementById('download-section').style.display = 'none';
+  document.getElementById('progress-section').style.display = 'none';
+  document.getElementById('limit-section').style.display    = 'none';
+  setOrbState(null); resetOrbLabel();
+  document.querySelectorAll('.fmt-pill').forEach(p => p.classList.remove('active'));
+  logLines = [];
+}
 </script>
 </body>
 </html>

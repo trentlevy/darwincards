@@ -12,29 +12,25 @@ pdf    → pdfplumber extract text → Claude → .apkg
 pptx   → python-pptx extract text → Claude → .apkg
 """
 
+import hashlib
 import json
-import math
 import os
 import re
-import subprocess
 import tempfile
 from pathlib import Path
 from typing import Callable, List, Dict
 
 import anthropic
 import genanki
-import openai
 import pdfplumber
 from pptx import Presentation
 
 # ---------------------------------------------------------------------------
-WHISPER_MAX_BYTES = 24 * 1024 * 1024
 WORDS_PER_CHUNK = 1500
 
-VIDEO_EXTS  = {".mp4", ".mov", ".mkv", ".avi", ".m4v", ".webm"}
-AUDIO_EXTS  = {".mp3", ".m4a", ".wav", ".ogg", ".flac"}
-SLIDE_EXTS  = {".pdf", ".pptx", ".ppt"}
-TEXT_EXTS   = {".txt"}
+SLIDE_EXTS = {".pdf", ".pptx", ".ppt"}
+TEXT_EXTS  = {".txt"}
+ALLOWED_EXTS = SLIDE_EXTS | TEXT_EXTS
 
 SYSTEM_PROMPT = """\
 You are a medical education expert who creates high-quality Anki flashcards \
@@ -82,30 +78,41 @@ CLOZE_MODEL = genanki.Model(
 # Public entry point
 # ---------------------------------------------------------------------------
 
+# Cost per million tokens by model (USD)
+_COST_PER_MILLION = {
+    "claude-opus-4-6":           {"input": 15.0,  "output": 75.0},
+    "claude-sonnet-4-6":         {"input":  3.0,  "output": 15.0},
+    "claude-haiku-4-5-20251001": {"input":  0.80, "output":  4.0},
+}
+
+
+def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
+    rates = _COST_PER_MILLION.get(model, {"input": 3.0, "output": 15.0})
+    return (input_tokens / 1_000_000) * rates["input"] + (output_tokens / 1_000_000) * rates["output"]
+
+
 def generate_cards_from_file(
     file_path: str,
-    openai_api_key: str,
     anthropic_api_key: str,
-    deck_name: str = "DarwinCards Deck",
+    deck_name: str = "DarwinCards",
     card_type: str = "both",
     cards_per_chunk: int = 8,
     language: str = "en",
-    claude_model: str = "claude-opus-4-6",
+    claude_model: str = "claude-sonnet-4-6",
     tags: List[str] = None,
     progress: Callable[[str], None] = lambda _: None,
-) -> str:
+) -> tuple:
     """
-    Auto-detects file type and runs the appropriate pipeline.
-    Returns path to a .apkg file (caller must delete when done).
+    Accepts transcripts (.txt), PDF slides (.pdf), or PowerPoint (.pptx/.ppt).
+    Returns (apkg_path, usage_stats).
     """
     tags = tags or []
     ext = Path(file_path).suffix.lower()
 
-    if ext in VIDEO_EXTS:
-        transcript = _video_to_transcript(file_path, openai_api_key, language, progress)
-    elif ext in AUDIO_EXTS:
-        transcript = _audio_to_transcript(file_path, openai_api_key, language, progress)
-    elif ext in TEXT_EXTS:
+    if ext not in ALLOWED_EXTS:
+        raise ValueError(f"Unsupported file type '{ext}'. Please upload a .txt, .pdf, or .pptx file.")
+
+    if ext in TEXT_EXTS:
         progress("Reading transcript…")
         transcript = Path(file_path).read_text(encoding="utf-8", errors="ignore")
     elif ext == ".pdf":
@@ -121,95 +128,21 @@ def generate_cards_from_file(
         raise ValueError("No text could be extracted from the file.")
 
     progress("Generating Anki cards with Claude…")
-    cards = _generate_cards(
+    cards, input_tokens, output_tokens = _generate_cards(
         transcript, anthropic_api_key, card_type,
         cards_per_chunk, claude_model, progress,
     )
 
     progress(f"Building .apkg deck with {len(cards)} card(s)…")
-    return _build_apkg(cards, deck_name, tags)
+    apkg_path = _build_apkg(cards, deck_name, tags)
 
-
-# ---------------------------------------------------------------------------
-# Video → transcript
-# ---------------------------------------------------------------------------
-
-def _video_to_transcript(video_path, api_key, language, progress):
-    progress("Extracting audio from video…")
-    audio_path = _extract_audio(video_path)
-    try:
-        progress("Splitting audio into segments…")
-        chunks = _split_audio(audio_path)
-        return _transcribe(chunks, api_key, language, progress)
-    finally:
-        _safe_remove(audio_path)
-
-
-def _audio_to_transcript(audio_path, api_key, language, progress):
-    progress("Splitting audio into segments…")
-    chunks = _split_audio(audio_path)
-    return _transcribe(chunks, api_key, language, progress)
-
-
-# ---------------------------------------------------------------------------
-# ffmpeg helpers
-# ---------------------------------------------------------------------------
-
-def _extract_audio(video_path: str) -> str:
-    tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
-    tmp.close()
-    cmd = [
-        "ffmpeg", "-y", "-i", video_path,
-        "-vn", "-acodec", "libmp3lame",
-        "-ar", "16000", "-ac", "1", "-b:a", "64k", tmp.name,
-    ]
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode != 0:
-        raise RuntimeError(f"ffmpeg error:\n{r.stderr[-2000:]}")
-    return tmp.name
-
-
-def _split_audio(audio_path: str) -> List[str]:
-    size = os.path.getsize(audio_path)
-    if size <= WHISPER_MAX_BYTES:
-        return [audio_path]
-
-    n_parts = math.ceil(size / WHISPER_MAX_BYTES)
-    probe = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "default=noprint_wrappers=1:nokey=1", audio_path],
-        capture_output=True, text=True,
-    )
-    duration = float(probe.stdout.strip())
-    seg_dur = math.ceil(duration / n_parts)
-
-    tmp_dir = tempfile.mkdtemp()
-    pattern = os.path.join(tmp_dir, "chunk_%03d.mp3")
-    r = subprocess.run(
-        ["ffmpeg", "-y", "-i", audio_path,
-         "-f", "segment", "-segment_time", str(seg_dur), "-c", "copy", pattern],
-        capture_output=True, text=True,
-    )
-    if r.returncode != 0:
-        raise RuntimeError(f"ffmpeg split error:\n{r.stderr[-2000:]}")
-    return sorted(str(p) for p in Path(tmp_dir).glob("chunk_*.mp3"))
-
-
-# ---------------------------------------------------------------------------
-# Whisper transcription
-# ---------------------------------------------------------------------------
-
-def _transcribe(chunks, api_key, language, progress):
-    client = openai.OpenAI(api_key=api_key)
-    parts = []
-    for i, path in enumerate(chunks, 1):
-        progress(f"Transcribing segment {i}/{len(chunks)}…")
-        with open(path, "rb") as f:
-            resp = client.audio.transcriptions.create(
-                model="whisper-1", file=f, language=language,
-            )
-        parts.append(resp.text)
-    return "\n\n".join(parts)
+    usage_stats = {
+        "model": claude_model,
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "estimated_cost_usd": _estimate_cost(claude_model, input_tokens, output_tokens),
+    }
+    return apkg_path, usage_stats
 
 
 # ---------------------------------------------------------------------------
@@ -253,6 +186,8 @@ def _generate_cards(transcript, api_key, card_type, cards_per_chunk, model, prog
 
     chunks = _chunk_text(transcript, WORDS_PER_CHUNK)
     all_cards = []
+    total_input_tokens = 0
+    total_output_tokens = 0
 
     for i, chunk in enumerate(chunks, 1):
         progress(f"Generating cards for section {i}/{len(chunks)}…")
@@ -267,17 +202,24 @@ def _generate_cards(transcript, api_key, card_type, cards_per_chunk, model, prog
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": msg}],
         )
+        total_input_tokens  += resp.usage.input_tokens
+        total_output_tokens += resp.usage.output_tokens
         all_cards.extend(_parse_cards(resp.content[0].text.strip()))
 
-    return all_cards
+    return all_cards, total_input_tokens, total_output_tokens
 
 
 # ---------------------------------------------------------------------------
 # Build .apkg
 # ---------------------------------------------------------------------------
 
+def _stable_id(text: str) -> int:
+    """SHA-256-based stable integer ID from a string (survives process restarts)."""
+    return int(hashlib.sha256(text.encode()).hexdigest(), 16) % (10 ** 10)
+
+
 def _build_apkg(cards: List[Dict], deck_name: str, tags: List[str]) -> str:
-    deck_id = abs(hash(deck_name)) % (10 ** 10)
+    deck_id = _stable_id(deck_name)
     deck = genanki.Deck(deck_id, deck_name)
 
     for card in cards:
@@ -286,10 +228,13 @@ def _build_apkg(cards: List[Dict], deck_name: str, tags: List[str]) -> str:
         back  = card.get("back", "").strip()
         if not front:
             continue
+        # Stable GUID: same card front+back always maps to the same note ID,
+        # so re-importing into Anki updates rather than duplicates the card.
+        guid = _stable_id(f"{ctype}:{front}:{back}")
         if ctype == "cloze":
-            note = genanki.Note(model=CLOZE_MODEL, fields=[front, back], tags=tags)
+            note = genanki.Note(model=CLOZE_MODEL, fields=[front, back], tags=tags, guid=guid)
         else:
-            note = genanki.Note(model=BASIC_MODEL, fields=[front, back], tags=tags)
+            note = genanki.Note(model=BASIC_MODEL, fields=[front, back], tags=tags, guid=guid)
         deck.add_note(note)
 
     tmp = tempfile.NamedTemporaryFile(suffix=".apkg", delete=False)
