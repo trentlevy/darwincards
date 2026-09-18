@@ -132,6 +132,7 @@ async def start_generation(
     files: List[UploadFile] = File(...),
     deck_name: str = Form("DarwinCards"),
     card_type: str = Form("both"),
+    image_occlusion: str = Form("true"),
     cards_per_chunk: int = Form(8),
     language: str = Form("en"),
     claude_model: str = Form("claude-sonnet-4-6"),
@@ -178,8 +179,8 @@ async def start_generation(
         None, _run_pipeline,
         job_id, ip, tmp_paths,
         ANTHROPIC_API_KEY,
-        deck_name, card_type, cards_per_chunk,
-        language, claude_model, tag_list,
+        deck_name, card_type, image_occlusion.lower() == "true",
+        cards_per_chunk, language, claude_model, tag_list,
     )
 
     return {"job_id": job_id}
@@ -187,8 +188,8 @@ async def start_generation(
 
 def _run_pipeline(job_id, ip_address, file_paths,
                   anthropic_key,
-                  deck_name, card_type, cards_per_chunk,
-                  language, claude_model, tags):
+                  deck_name, card_type, include_images,
+                  cards_per_chunk, language, claude_model, tags):
 
     def progress(msg: str):
         _job_append_message(job_id, msg)
@@ -199,6 +200,7 @@ def _run_pipeline(job_id, ip_address, file_paths,
             anthropic_api_key=anthropic_key,
             deck_name=deck_name,
             card_type=card_type,
+            include_images=include_images,
             cards_per_chunk=cards_per_chunk,
             language=language,
             claude_model=claude_model,

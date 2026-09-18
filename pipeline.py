@@ -12,18 +12,21 @@ pdf    → pdfplumber extract text → Claude → .apkg
 pptx   → python-pptx extract text → Claude → .apkg
 """
 
+import base64
 import hashlib
 import json
 import os
 import re
 import tempfile
 from pathlib import Path
-from typing import Callable, List, Dict
+from typing import Callable, List, Dict, Tuple, Optional
 
 import anthropic
+import fitz  # pymupdf
 import genanki
 import pdfplumber
 from pptx import Presentation
+from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 # ---------------------------------------------------------------------------
 WORDS_PER_CHUNK = 1500
@@ -104,6 +107,43 @@ CLOZE_MODEL = genanki.Model(
     css=_CARD_CSS,
 )
 
+IMAGE_CARD_MODEL_ID = 1607392321
+IMAGE_CARD_MODEL = genanki.Model(
+    IMAGE_CARD_MODEL_ID,
+    "DarwinCards – Image",
+    fields=[{"name": "Question"}, {"name": "Image"}, {"name": "Answer"}],
+    templates=[{
+        "name": "Image Card",
+        "qfmt": '<div class="front">{{Question}}</div><div class="img-wrap">{{Image}}</div>',
+        "afmt": '<div class="front">{{Question}}</div><div class="img-wrap">{{Image}}</div><hr id=answer><div class="back">{{Answer}}</div>',
+    }],
+    css=_CARD_CSS + """
+.img-wrap img { max-width: 100%; height: auto; border-radius: 8px; margin: 10px 0; }
+""",
+)
+
+IMAGE_SYSTEM_PROMPT = """\
+You are a medical education expert analyzing a slide image to create Anki flashcards.
+
+If the image contains a labeled diagram, anatomical illustration, chart, or table with medical content:
+- Create 2-4 cards that test knowledge of specific elements visible in the image
+- For anatomical diagrams: ask "What structure is labeled X?" or "What is the function of [visible structure]?"
+- For charts/graphs: ask about specific values, trends, or relationships
+- For tables: ask about specific cell values or comparisons
+- Keep questions focused on ONE element per card
+- Keep answers concise (one sentence)
+
+If the image is decorative, a title slide, or contains no testable medical content, return [].
+
+Respond with valid JSON only:
+[{"question": "...", "answer": "..."}]
+"""
+
+# Max images to process per file (to control cost)
+MAX_IMAGES_PER_FILE = 8
+# Skip images smaller than this (likely icons/logos)
+MIN_IMAGE_BYTES = 15_000
+
 
 # ---------------------------------------------------------------------------
 # Public entry point
@@ -127,6 +167,7 @@ def generate_cards_from_file(
     anthropic_api_key: str,
     deck_name: str = "DarwinCards",
     card_type: str = "both",
+    include_images: bool = True,
     cards_per_chunk: int = 8,
     language: str = "en",
     claude_model: str = "claude-sonnet-4-6",
@@ -173,14 +214,35 @@ def generate_cards_from_file(
         cards_per_chunk, claude_model, progress,
     )
 
-    progress(f"Building .apkg deck with {len(cards)} card(s)…")
-    apkg_path = _build_apkg(cards, deck_name, tags)
+    # Extract images from slide files and generate image-based cards
+    image_cards = []
+    img_input_tokens = img_output_tokens = 0
+    if include_images:
+        for file_path in file_paths:
+            ext = Path(file_path).suffix.lower()
+            if ext in {".pdf", ".pptx", ".ppt"}:
+                try:
+                    images = _extract_images(file_path, ext)
+                    if images:
+                        progress(f"Generating image cards from {len(images)} slide image(s)…")
+                        ic, it, ot = _generate_image_cards(images, anthropic_api_key, claude_model, progress)
+                        image_cards.extend(ic)
+                        img_input_tokens  += it
+                        img_output_tokens += ot
+                except Exception as e:
+                    progress(f"Image extraction skipped: {e}")
 
+    all_cards = cards + image_cards
+    progress(f"Building .apkg deck with {len(all_cards)} card(s) ({len(image_cards)} image)…")
+    apkg_path = _build_apkg(all_cards, deck_name, tags)
+
+    total_in  = input_tokens  + img_input_tokens
+    total_out = output_tokens + img_output_tokens
     usage_stats = {
         "model": claude_model,
-        "input_tokens": input_tokens,
-        "output_tokens": output_tokens,
-        "estimated_cost_usd": _estimate_cost(claude_model, input_tokens, output_tokens),
+        "input_tokens":  total_in,
+        "output_tokens": total_out,
+        "estimated_cost_usd": _estimate_cost(claude_model, total_in, total_out),
     }
     return apkg_path, usage_stats
 
@@ -210,6 +272,95 @@ def _extract_pptx_text(pptx_path: str) -> str:
         if texts:
             slides.append("\n".join(texts))
     return "\n\n---\n\n".join(slides)
+
+
+# ---------------------------------------------------------------------------
+# Image extraction
+# ---------------------------------------------------------------------------
+
+def _extract_images(file_path: str, ext: str) -> List[Tuple[bytes, str]]:
+    """Return list of (image_bytes, media_type) for meaningful images in the file."""
+    images = []
+    if ext == ".pdf":
+        doc = fitz.open(file_path)
+        for page in doc:
+            for img_info in page.get_images(full=True):
+                xref = img_info[0]
+                base_image = doc.extract_image(xref)
+                img_bytes = base_image["image"]
+                if len(img_bytes) < MIN_IMAGE_BYTES:
+                    continue
+                raw_ext = base_image.get("ext", "png")
+                media_type = "image/jpeg" if raw_ext in ("jpg", "jpeg") else f"image/{raw_ext}"
+                if media_type not in ("image/jpeg", "image/png", "image/webp", "image/gif"):
+                    media_type = "image/png"
+                images.append((img_bytes, media_type))
+                if len(images) >= MAX_IMAGES_PER_FILE:
+                    break
+            if len(images) >= MAX_IMAGES_PER_FILE:
+                break
+        doc.close()
+    elif ext in {".pptx", ".ppt"}:
+        prs = Presentation(file_path)
+        for slide in prs.slides:
+            for shape in slide.shapes:
+                if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+                    img = shape.image
+                    img_bytes = img.blob
+                    if len(img_bytes) < MIN_IMAGE_BYTES:
+                        continue
+                    content_type = img.content_type or "image/png"
+                    images.append((img_bytes, content_type))
+                    if len(images) >= MAX_IMAGES_PER_FILE:
+                        break
+            if len(images) >= MAX_IMAGES_PER_FILE:
+                break
+    return images
+
+
+def _generate_image_cards(
+    images: List[Tuple[bytes, str]],
+    api_key: str,
+    model: str,
+    progress: Callable,
+) -> Tuple[List[Dict], int, int]:
+    """Send each image to Claude Vision, return image-based card dicts."""
+    client = anthropic.Anthropic(api_key=api_key)
+    all_cards: List[Dict] = []
+    total_in = total_out = 0
+
+    for i, (img_bytes, media_type) in enumerate(images, 1):
+        try:
+            img_b64 = base64.b64encode(img_bytes).decode()
+            resp = client.messages.create(
+                model=model,
+                max_tokens=1024,
+                system=IMAGE_SYSTEM_PROMPT,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {"type": "base64", "media_type": media_type, "data": img_b64},
+                        },
+                        {"type": "text", "text": "Generate flashcards for this medical slide image."},
+                    ],
+                }],
+            )
+            total_in  += resp.usage.input_tokens
+            total_out += resp.usage.output_tokens
+            raw = resp.content[0].text.strip()
+            parsed = _parse_cards(raw)
+            # Tag these as image cards and attach the embedded image HTML
+            img_tag = f'<img src="data:{media_type};base64,{img_b64}">'
+            for card in parsed:
+                card["type"]  = "image"
+                card["image"] = img_tag
+            all_cards.extend(parsed)
+        except Exception as e:
+            print(f"[image card error] image {i}: {e}")
+
+    return all_cards, total_in, total_out
 
 
 # ---------------------------------------------------------------------------
@@ -266,13 +417,16 @@ def _build_apkg(cards: List[Dict], deck_name: str, tags: List[str]) -> str:
         ctype = card.get("type", "basic")
         front = card.get("front", "").strip()
         back  = card.get("back", "").strip()
-        if not front:
+        image = card.get("image", "")
+        if not front and not image:
             continue
-        # Stable GUID: same card front+back always maps to the same note ID,
-        # so re-importing into Anki updates rather than duplicates the card.
-        guid = _stable_id(f"{ctype}:{front}:{back}")
+        guid = _stable_id(f"{ctype}:{front}:{back}:{image[:64]}")
         if ctype == "cloze":
             note = genanki.Note(model=CLOZE_MODEL, fields=[front, back], tags=tags, guid=guid)
+        elif ctype == "image":
+            question = front or card.get("question", "")
+            answer   = back  or card.get("answer", "")
+            note = genanki.Note(model=IMAGE_CARD_MODEL, fields=[question, image, answer], tags=tags, guid=guid)
         else:
             note = genanki.Note(model=BASIC_MODEL, fields=[front, back], tags=tags, guid=guid)
         deck.add_note(note)

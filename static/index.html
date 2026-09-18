@@ -76,7 +76,7 @@
       letter-spacing: -.03em;
       text-align: center;
       margin-bottom: .6rem;
-      color: #f1f5f9;
+      color: #1d1d1f;
       line-height: 1.2;
     }
     .hero-sub {
@@ -158,10 +158,10 @@
     .orb-icon  { font-size: 1.4rem; margin-bottom: .3rem; line-height: 1; }
     .orb-title {
       font-size: .95rem; font-weight: 700;
-      color: rgba(255,255,255,.92);
+      color: #1d1d1f;
     }
     .orb-sub {
-      font-size: .75rem; color: rgba(255,255,255,.45);
+      font-size: .75rem; color: rgba(0,0,0,.45);
       margin-top: .2rem;
     }
     #orb-file-name {
@@ -259,6 +259,41 @@
     details summary { cursor: pointer; font-size: .78rem; color: #2563eb; user-select: none; padding: .35rem 0 0; }
     details[open] summary { margin-bottom: .8rem; }
     hr.divider { border: none; border-top: 1px solid var(--border); margin: .85rem 0; }
+
+    /* ── Apple-style toggle ── */
+    .toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: .85rem;
+    }
+    .toggle-row .toggle-label {
+      display: flex; flex-direction: column; gap: .15rem;
+    }
+    .toggle-row .toggle-label span {
+      font-size: .72rem; font-weight: 600;
+      color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em;
+    }
+    .toggle-row .toggle-label small {
+      font-size: .72rem; color: var(--text-muted); font-weight: 400;
+      text-transform: none; letter-spacing: 0;
+    }
+    .ios-toggle { position: relative; width: 51px; height: 31px; flex-shrink: 0; }
+    .ios-toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .ios-toggle .track {
+      position: absolute; inset: 0; border-radius: 999px;
+      background: rgba(0,0,0,.12);
+      transition: background .25s cubic-bezier(.4,0,.2,1);
+      cursor: pointer;
+    }
+    .ios-toggle input:checked + .track { background: #34c759; }
+    .ios-toggle .thumb {
+      position: absolute; top: 2px; left: 2px;
+      width: 27px; height: 27px; border-radius: 50%;
+      background: white;
+      box-shadow: 0 1px 4px rgba(0,0,0,.25), 0 2px 8px rgba(0,0,0,.12);
+      transition: transform .25s cubic-bezier(.4,0,.2,1);
+      pointer-events: none;
+    }
+    .ios-toggle input:checked ~ .thumb { transform: translateX(20px); }
 
     /* ── Progress ── */
     #progress-section { display: none; margin-bottom: 1rem; }
@@ -419,6 +454,17 @@
           <option value="cloze">Cloze only</option>
           <option value="basic">Basic only</option>
         </select>
+      </div>
+      <div class="toggle-row">
+        <div class="toggle-label">
+          <span>Image Occlusion</span>
+          <small>Generate cards from slide images (PDF &amp; PPTX)</small>
+        </div>
+        <label class="ios-toggle">
+          <input type="checkbox" id="image-occlusion" checked />
+          <div class="track"></div>
+          <div class="thumb"></div>
+        </label>
       </div>
       <hr class="divider" />
       <details>
@@ -760,7 +806,8 @@ async function startGeneration() {
   const fd = new FormData();
   selectedFiles.forEach(f => fd.append('files', f));
   fd.append('deck_name',       document.getElementById('deck-name').value || 'DarwinCards');
-  fd.append('card_type',       document.getElementById('card-type').value || 'both');
+  fd.append('card_type',        document.getElementById('card-type').value || 'both');
+  fd.append('image_occlusion',  document.getElementById('image-occlusion').checked ? 'true' : 'false');
   fd.append('cards_per_chunk', '8');
   fd.append('language',        document.getElementById('language').value || 'en');
   fd.append('claude_model',    document.getElementById('claude-model').value);
