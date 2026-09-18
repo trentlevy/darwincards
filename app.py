@@ -266,15 +266,18 @@ async def progress_stream(job_id: str):
                     return
             if job["status"] in ("done", "error") and sent >= len(messages):
                 return
-            # Send a keepalive ping every 15s to prevent Railway's proxy from
-            # closing the SSE connection during long generations
+            # Send a keepalive ping every 10s — Railway's nginx proxy drops
+            # idle SSE connections; X-Accel-Buffering: no disables buffering.
             now = asyncio.get_event_loop().time()
-            if now - last_ping > 15:
-                yield {"comment": "keepalive"}
+            if now - last_ping > 10:
+                yield {"event": "ping", "data": ""}
                 last_ping = now
             await asyncio.sleep(0.5)
 
-    return EventSourceResponse(event_generator())
+    return EventSourceResponse(
+        event_generator(),
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -821,6 +821,7 @@ async function startGeneration() {
   } catch (err) { showErr(err.message); return; }
 
   eventSource = new EventSource(`/api/progress/${jobId}`);
+  eventSource.addEventListener('ping', () => {}); // keepalive — ignore
   eventSource.onmessage = e => {
     const msg = e.data;
     if (msg.startsWith('__DONE__')) {
