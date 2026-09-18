@@ -95,6 +95,30 @@
       height: 280px;
       margin-bottom: 2rem;
       cursor: pointer;
+      overflow: visible;
+    }
+
+    /* ── Orbiting file chips ── */
+    .orbit-chip {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 48px; height: 22px;
+      margin-top: -11px; margin-left: -24px;
+      border-radius: 999px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .62rem; font-weight: 800; letter-spacing: .05em;
+      text-transform: uppercase;
+      pointer-events: none;
+      z-index: 10;
+      animation: orbit-spin var(--orbit-dur, 7s) linear infinite;
+      animation-delay: var(--orbit-offset, 0s);
+    }
+    .orbit-chip.type-pdf  { background: rgba(239,68,68,.18);  color: #fca5a5; border: 1px solid rgba(239,68,68,.35); box-shadow: 0 0 10px rgba(239,68,68,.25); }
+    .orbit-chip.type-txt  { background: rgba(96,165,250,.18); color: #93c5fd; border: 1px solid rgba(96,165,250,.35); box-shadow: 0 0 10px rgba(96,165,250,.25); }
+    .orbit-chip.type-pptx { background: rgba(251,146,60,.18); color: #fdba74; border: 1px solid rgba(251,146,60,.35); box-shadow: 0 0 10px rgba(251,146,60,.25); }
+    @keyframes orbit-spin {
+      from { transform: rotate(0deg)   translateX(158px) rotate(0deg); }
+      to   { transform: rotate(360deg) translateX(158px) rotate(-360deg); }
     }
 
     /* Outer ambient glow */
@@ -712,17 +736,36 @@ function getType(name) {
   return 'pptx';
 }
 
+function spawnOrbitChips(files) {
+  // Remove any existing chips
+  document.querySelectorAll('.orbit-chip').forEach(c => c.remove());
+  const orbWrap = document.getElementById('orb');
+  const durations = [7, 9, 11]; // slightly different speeds per chip
+  const offsets   = [0, -3, -6]; // spread them around the orbit
+  files.forEach((f, i) => {
+    const type = getType(f.name);
+    const label = type === 'pptx' ? 'pptx' : type;
+    const chip = document.createElement('div');
+    chip.className = `orbit-chip type-${type}`;
+    chip.textContent = label.toUpperCase();
+    chip.style.setProperty('--orbit-dur',    `${durations[i % durations.length]}s`);
+    chip.style.setProperty('--orbit-offset', `${offsets[i % offsets.length]}s`);
+    orbWrap.appendChild(chip);
+  });
+}
+
 function selectFiles(files) {
   selectedFiles = files.filter(f => /\.(txt|pdf|pptx|ppt)$/i.test(f.name));
   if (!selectedFiles.length) return;
   const count = selectedFiles.length;
   const totalMB = (selectedFiles.reduce((s, f) => s + f.size, 0) / 1024 / 1024).toFixed(1);
-  document.getElementById('orb-icon').textContent  = count > 1 ? count.toString() : FILE_META[getType(selectedFiles[0].name)].icon;
-  document.getElementById('orb-title').textContent = count > 1 ? `${count} files loaded` : FILE_META[getType(selectedFiles[0].name)].label;
-  document.getElementById('orb-sub').textContent   = `${totalMB} MB total`;
+  document.getElementById('orb-icon').textContent  = '';
+  document.getElementById('orb-title').textContent = count > 1 ? `${count} files ready` : FILE_META[getType(selectedFiles[0].name)].label;
+  document.getElementById('orb-sub').textContent   = `${totalMB} MB · ready to generate`;
   document.getElementById('orb-file-name').textContent = selectedFiles.map(f => f.name).join(', ');
   document.querySelectorAll('.fmt-pill').forEach(p => p.classList.remove('active'));
   selectedFiles.forEach(f => document.querySelector(`.fmt-pill.${FILE_META[getType(f.name)]?.badge}`)?.classList.add('active'));
+  spawnOrbitChips(selectedFiles);
 }
 
 async function startGeneration() {
@@ -733,6 +776,7 @@ async function startGeneration() {
   document.getElementById('limit-section').style.display    = 'none';
   document.getElementById('progress-section').style.display = 'block';
   logLines = []; renderLog();
+  document.querySelectorAll('.orbit-chip').forEach(c => c.remove());
   setOrbState('processing');
   document.getElementById('orb-icon').textContent  = '···';
   document.getElementById('orb-title').textContent = 'Generating…';
@@ -817,6 +861,7 @@ function showErr(msg) {
   document.getElementById('generate-btn').disabled = false;
 }
 function resetOrbLabel() {
+  document.querySelectorAll('.orbit-chip').forEach(c => c.remove());
   document.getElementById('orb-icon').textContent  = '↑';
   document.getElementById('orb-title').textContent = 'Drop your lectures here';
   document.getElementById('orb-sub').textContent   = 'or click to browse — combine multiple files';
