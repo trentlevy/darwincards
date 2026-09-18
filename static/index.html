@@ -366,13 +366,13 @@
     <div class="orb-ambient" id="orb-ambient"></div>
     <canvas id="orb-canvas" width="280" height="280"></canvas>
 
-    <input type="file" id="file-input" accept=".txt,.pdf,.pptx,.ppt" />
+    <input type="file" id="file-input" accept=".txt,.pdf,.pptx,.ppt" multiple />
   </div>
 
   <div class="orb-label">
     <div class="orb-icon" id="orb-icon">↑</div>
-    <div class="orb-title" id="orb-title">Drop your lecture here</div>
-    <div class="orb-sub"  id="orb-sub">or click to browse</div>
+    <div class="orb-title" id="orb-title">Drop your lectures here</div>
+    <div class="orb-sub"  id="orb-sub">or click to browse — combine multiple files</div>
     <div id="orb-file-name"></div>
   </div>
 
@@ -429,24 +429,6 @@
       <div class="form-row">
         <label>Deck Name</label>
         <input type="text" id="deck-name" value="DarwinCards" placeholder="e.g. DarwinCards" />
-      </div>
-      <div class="two-col">
-        <div class="form-row">
-          <label>Card Types</label>
-          <select id="card-type">
-            <option value="both">Basic + Cloze</option>
-            <option value="basic">Basic only</option>
-            <option value="cloze">Cloze only</option>
-          </select>
-        </div>
-        <div class="form-row">
-          <label>Cards / Section</label>
-          <select id="cards-per-chunk">
-            <option value="5">5 — concise</option>
-            <option value="8" selected>8 — recommended</option>
-            <option value="12">12 — comprehensive</option>
-          </select>
-        </div>
       </div>
       <hr class="divider" />
       <details>
@@ -704,7 +686,7 @@ function setOrbState(state) {
 // ─────────────────────────────────────────────
 // App logic
 // ─────────────────────────────────────────────
-let selectedFile = null, eventSource = null, logLines = [];
+let selectedFiles = [], eventSource = null, logLines = [];
 
 const FILE_META = {
   txt:  { icon: 'A', label: 'Transcript loaded', sub: 'Ready to generate', badge: 'txt'  },
@@ -716,10 +698,12 @@ function orbDragOver(e)  { e.preventDefault(); document.getElementById('orb').st
 function orbDragLeave(e) { document.getElementById('orb').style.transform = ''; }
 function orbDrop(e) {
   e.preventDefault(); document.getElementById('orb').style.transform = '';
-  if (e.dataTransfer.files[0]) selectFile(e.dataTransfer.files[0]);
+  if (e.dataTransfer.files.length) selectFiles(Array.from(e.dataTransfer.files));
 }
 
-document.getElementById('file-input').addEventListener('change', e => { if (e.target.files[0]) selectFile(e.target.files[0]); });
+document.getElementById('file-input').addEventListener('change', e => {
+  if (e.target.files.length) selectFiles(Array.from(e.target.files));
+});
 
 function getType(name) {
   const ext = '.' + name.split('.').pop().toLowerCase();
@@ -728,19 +712,21 @@ function getType(name) {
   return 'pptx';
 }
 
-function selectFile(file) {
-  selectedFile = file;
-  const meta = FILE_META[getType(file.name)];
-  document.getElementById('orb-icon').textContent  = meta.icon;
-  document.getElementById('orb-title').textContent = meta.label;
-  document.getElementById('orb-sub').textContent   = `${(file.size/1024/1024).toFixed(1)} MB`;
-  document.getElementById('orb-file-name').textContent = file.name;
+function selectFiles(files) {
+  selectedFiles = files.filter(f => /\.(txt|pdf|pptx|ppt)$/i.test(f.name));
+  if (!selectedFiles.length) return;
+  const count = selectedFiles.length;
+  const totalMB = (selectedFiles.reduce((s, f) => s + f.size, 0) / 1024 / 1024).toFixed(1);
+  document.getElementById('orb-icon').textContent  = count > 1 ? count.toString() : FILE_META[getType(selectedFiles[0].name)].icon;
+  document.getElementById('orb-title').textContent = count > 1 ? `${count} files loaded` : FILE_META[getType(selectedFiles[0].name)].label;
+  document.getElementById('orb-sub').textContent   = `${totalMB} MB total`;
+  document.getElementById('orb-file-name').textContent = selectedFiles.map(f => f.name).join(', ');
   document.querySelectorAll('.fmt-pill').forEach(p => p.classList.remove('active'));
-  document.querySelector(`.fmt-pill.${meta.badge}`)?.classList.add('active');
+  selectedFiles.forEach(f => document.querySelector(`.fmt-pill.${FILE_META[getType(f.name)]?.badge}`)?.classList.add('active'));
 }
 
 async function startGeneration() {
-  if (!selectedFile) { alert('Drop a file into the orb first.'); return; }
+  if (!selectedFiles.length) { alert('Drop a file into the orb first.'); return; }
 
   document.getElementById('generate-btn').disabled = true;
   document.getElementById('download-section').style.display = 'none';
@@ -753,10 +739,10 @@ async function startGeneration() {
   document.getElementById('orb-sub').textContent   = 'Sit tight';
 
   const fd = new FormData();
-  fd.append('file',            selectedFile);
+  selectedFiles.forEach(f => fd.append('files', f));
   fd.append('deck_name',       document.getElementById('deck-name').value || 'DarwinCards');
-  fd.append('card_type',       document.getElementById('card-type').value);
-  fd.append('cards_per_chunk', document.getElementById('cards-per-chunk').value);
+  fd.append('card_type',       'both');
+  fd.append('cards_per_chunk', '8');
   fd.append('language',        document.getElementById('language').value || 'en');
   fd.append('claude_model',    document.getElementById('claude-model').value);
   fd.append('tags',            document.getElementById('tags').value);
@@ -832,12 +818,12 @@ function showErr(msg) {
 }
 function resetOrbLabel() {
   document.getElementById('orb-icon').textContent  = '↑';
-  document.getElementById('orb-title').textContent = 'Drop your lecture here';
-  document.getElementById('orb-sub').textContent   = 'or click to browse';
+  document.getElementById('orb-title').textContent = 'Drop your lectures here';
+  document.getElementById('orb-sub').textContent   = 'or click to browse — combine multiple files';
   document.getElementById('orb-file-name').textContent = '';
 }
 function restart() {
-  selectedFile = null;
+  selectedFiles = [];
   document.getElementById('download-section').style.display = 'none';
   document.getElementById('progress-section').style.display = 'none';
   document.getElementById('limit-section').style.display    = 'none';

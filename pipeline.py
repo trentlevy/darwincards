@@ -92,7 +92,7 @@ def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
 
 
 def generate_cards_from_file(
-    file_path: str,
+    file_paths,
     anthropic_api_key: str,
     deck_name: str = "DarwinCards",
     card_type: str = "both",
@@ -103,29 +103,38 @@ def generate_cards_from_file(
     progress: Callable[[str], None] = lambda _: None,
 ) -> tuple:
     """
-    Accepts transcripts (.txt), PDF slides (.pdf), or PowerPoint (.pptx/.ppt).
+    Accepts one or more files: transcripts (.txt), PDF slides (.pdf), or PowerPoint (.pptx/.ppt).
+    Multiple files are merged into a single transcript before card generation.
     Returns (apkg_path, usage_stats).
     """
     tags = tags or []
-    ext = Path(file_path).suffix.lower()
+    if isinstance(file_paths, str):
+        file_paths = [file_paths]
 
-    if ext not in ALLOWED_EXTS:
-        raise ValueError(f"Unsupported file type '{ext}'. Please upload a .txt, .pdf, or .pptx file.")
+    sections = []
+    for file_path in file_paths:
+        ext = Path(file_path).suffix.lower()
+        if ext not in ALLOWED_EXTS:
+            raise ValueError(f"Unsupported file type '{ext}'. Please upload .txt, .pdf, or .pptx files.")
+        if ext in TEXT_EXTS:
+            progress(f"Reading transcript ({Path(file_path).name})…")
+            text = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+        elif ext == ".pdf":
+            progress(f"Extracting text from PDF ({Path(file_path).name})…")
+            text = _extract_pdf_text(file_path)
+        elif ext in {".pptx", ".ppt"}:
+            progress(f"Extracting text from PowerPoint ({Path(file_path).name})…")
+            text = _extract_pptx_text(file_path)
+        else:
+            raise ValueError(f"Unsupported file type: {ext}")
+        if text.strip():
+            sections.append(text.strip())
 
-    if ext in TEXT_EXTS:
-        progress("Reading transcript…")
-        transcript = Path(file_path).read_text(encoding="utf-8", errors="ignore")
-    elif ext == ".pdf":
-        progress("Extracting text from PDF slides…")
-        transcript = _extract_pdf_text(file_path)
-    elif ext in {".pptx", ".ppt"}:
-        progress("Extracting text from PowerPoint slides…")
-        transcript = _extract_pptx_text(file_path)
-    else:
-        raise ValueError(f"Unsupported file type: {ext}")
+    if not sections:
+        raise ValueError("No text could be extracted from the uploaded file(s).")
 
-    if not transcript.strip():
-        raise ValueError("No text could be extracted from the file.")
+    # Merge all sources with a clear divider so Claude sees them as one body of material
+    transcript = "\n\n━━━ NEW SOURCE ━━━\n\n".join(sections)
 
     progress("Generating Anki cards with Claude…")
     cards, input_tokens, output_tokens = _generate_cards(

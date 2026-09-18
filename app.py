@@ -21,7 +21,7 @@ import os
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Depends, Request
 from fastapi.responses import FileResponse, HTMLResponse
@@ -120,8 +120,8 @@ def get_status(db: Session = Depends(get_db)):
 @app.post("/api/generate")
 async def start_generation(
     request: Request,
-    file: UploadFile = File(...),
-    deck_name: str = Form("DarwinCards Deck"),
+    files: List[UploadFile] = File(...),
+    deck_name: str = Form("DarwinCards"),
     card_type: str = Form("both"),
     cards_per_chunk: int = Form(8),
     language: str = Form("en"),
@@ -154,21 +154,24 @@ async def start_generation(
             detail=f"You've reached the daily limit ({IP_DAILY_LIMIT} generations per day). Check back tomorrow."
         )
 
-    # Save upload to a temp file
+    # Save all uploads to temp files
     job_id = str(uuid.uuid4())
     jobs[job_id] = {"status": "running", "messages": [], "apkg_path": None, "error": None}
 
-    ext = Path(file.filename or "upload.tmp").suffix.lower()
-    tmp = tempfile.NamedTemporaryFile(suffix=ext or ".tmp", delete=False)
-    tmp.write(await file.read())
-    tmp.close()
+    tmp_paths = []
+    for file in files:
+        ext = Path(file.filename or "upload.tmp").suffix.lower()
+        tmp = tempfile.NamedTemporaryFile(suffix=ext or ".tmp", delete=False)
+        tmp.write(await file.read())
+        tmp.close()
+        tmp_paths.append(tmp.name)
 
     tag_list = [t.strip() for t in tags.split() if t.strip()]
 
     loop = asyncio.get_event_loop()
     loop.run_in_executor(
         None, _run_pipeline,
-        job_id, ip, tmp.name,
+        job_id, ip, tmp_paths,
         ANTHROPIC_API_KEY,
         deck_name, card_type, cards_per_chunk,
         language, claude_model, tag_list,
@@ -177,7 +180,7 @@ async def start_generation(
     return {"job_id": job_id}
 
 
-def _run_pipeline(job_id, ip_address, file_path,
+def _run_pipeline(job_id, ip_address, file_paths,
                   anthropic_key,
                   deck_name, card_type, cards_per_chunk,
                   language, claude_model, tags):
@@ -188,7 +191,7 @@ def _run_pipeline(job_id, ip_address, file_path,
 
     try:
         apkg_path, usage_stats = generate_cards_from_file(
-            file_path=file_path,
+            file_paths=file_paths,
             anthropic_api_key=anthropic_key,
             deck_name=deck_name,
             card_type=card_type,
@@ -232,10 +235,11 @@ def _run_pipeline(job_id, ip_address, file_path,
         job["error"] = str(e)
         job["messages"].append(f"__ERROR__{e}")
     finally:
-        try:
-            os.remove(file_path)
-        except OSError:
-            pass
+        for p in file_paths:
+            try:
+                os.remove(p)
+            except OSError:
+                pass
 
 
 # ---------------------------------------------------------------------------
