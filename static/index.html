@@ -454,6 +454,14 @@
         <label>Deck Name</label>
         <input type="text" id="deck-name" value="DarwinCards" placeholder="e.g. DarwinCards" />
       </div>
+      <div class="form-row">
+        <label>Card Types</label>
+        <select id="card-type">
+          <option value="both">Basic + Cloze</option>
+          <option value="cloze">Cloze only</option>
+          <option value="basic">Basic only</option>
+        </select>
+      </div>
       <hr class="divider" />
       <details>
         <summary>Advanced options</summary>
@@ -794,7 +802,7 @@ async function startGeneration() {
   const fd = new FormData();
   selectedFiles.forEach(f => fd.append('files', f));
   fd.append('deck_name',       document.getElementById('deck-name').value || 'DarwinCards');
-  fd.append('card_type',       'both');
+  fd.append('card_type',       document.getElementById('card-type').value || 'both');
   fd.append('cards_per_chunk', '8');
   fd.append('language',        document.getElementById('language').value || 'en');
   fd.append('claude_model',    document.getElementById('claude-model').value);
