@@ -2,7 +2,7 @@
 Database models
 """
 import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Float, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Float, ForeignKey, Text, LargeBinary
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -50,3 +50,14 @@ class GenerationLog(Base):
     input_tokens       = Column(Integer, default=0)
     output_tokens      = Column(Integer, default=0)
     model              = Column(String, default="")
+
+
+class Job(Base):
+    """Tracks generation jobs — stored in DB so they survive container restarts."""
+    __tablename__ = "jobs"
+    id           = Column(String, primary_key=True)
+    status       = Column(String, default="running")   # running / done / error
+    messages_json = Column(Text, default="[]")          # JSON array of progress strings
+    apkg_data    = Column(LargeBinary, nullable=True)  # completed .apkg bytes
+    error        = Column(String, nullable=True)
+    created_at   = Column(DateTime, default=datetime.datetime.utcnow)

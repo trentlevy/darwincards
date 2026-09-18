@@ -6,30 +6,33 @@ Two guards prevent runaway spend:
   1. Global monthly cap  – stops all generation once estimated spend hits $95.
   2. Per-IP daily limit  – max 5 generations per IP per 24 hours.
 
+Job state is stored in PostgreSQL so it survives container restarts.
+
 Endpoints
 ---------
 GET  /                          Frontend
 POST /api/generate              Upload file, returns {job_id}
-GET  /api/progress/{job_id}     SSE progress stream
+GET  /api/progress/{job_id}     Poll for progress (JSON)
 GET  /api/download/{job_id}     Download .apkg
 GET  /api/status                Current monthly cost / capacity info
 """
 
 import asyncio
 import datetime
+import json
 import os
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import List
 
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Depends, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 from database import Base, engine, get_db, SessionLocal
-from models import GlobalUsage, GenerationLog
+from models import GlobalUsage, GenerationLog, Job
 from pipeline import generate_cards_from_file
 
 # ---------------------------------------------------------------------------
@@ -44,14 +47,8 @@ STATIC_DIR = Path(__file__).parent / "static"
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-jobs: Dict[str, Any] = {}
-
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-
-# Cost guard — stop accepting jobs once estimated monthly spend reaches this
 MONTHLY_COST_LIMIT_USD = 95.0
-
-# Per-IP rate limit — max generations per rolling 24-hour window
 IP_DAILY_LIMIT = 5
 
 
@@ -60,7 +57,6 @@ IP_DAILY_LIMIT = 5
 # ---------------------------------------------------------------------------
 
 def get_client_ip(request: Request) -> str:
-    """Resolve real client IP, accounting for Railway's proxy."""
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
         return forwarded.split(",")[0].strip()
@@ -82,6 +78,20 @@ def get_or_create_monthly(db: Session) -> GlobalUsage:
         db.commit()
         db.refresh(row)
     return row
+
+
+def _job_append_message(job_id: str, msg: str):
+    """Append a progress message to the job row — called from the pipeline thread."""
+    db = SessionLocal()
+    try:
+        job = db.query(Job).filter(Job.id == job_id).first()
+        if job:
+            msgs = json.loads(job.messages_json or "[]")
+            msgs.append(msg)
+            job.messages_json = json.dumps(msgs)
+            db.commit()
+    finally:
+        db.close()
 
 
 # ---------------------------------------------------------------------------
@@ -133,30 +143,26 @@ async def start_generation(
 
     ip = get_client_ip(request)
 
-    # Global monthly cost check
     monthly = get_or_create_monthly(db)
     if monthly.estimated_cost_usd >= MONTHLY_COST_LIMIT_USD:
-        raise HTTPException(
-            status_code=503,
-            detail="DarwinCards is at capacity for this month. Check back next month."
-        )
+        raise HTTPException(status_code=503,
+            detail="DarwinCards is at capacity for this month. Check back next month.")
 
-    # Per-IP daily limit
     cutoff = datetime.datetime.utcnow() - datetime.timedelta(hours=24)
     ip_count = db.query(GenerationLog).filter(
         GenerationLog.ip_address == ip,
         GenerationLog.created_at >= cutoff,
     ).count()
     if ip_count >= IP_DAILY_LIMIT:
-        raise HTTPException(
-            status_code=429,
-            detail=f"You've reached the daily limit ({IP_DAILY_LIMIT} generations per day). Check back tomorrow."
-        )
+        raise HTTPException(status_code=429,
+            detail=f"You've reached the daily limit ({IP_DAILY_LIMIT} generations per day). Check back tomorrow.")
 
-    # Save all uploads to temp files
+    # Create job row in DB
     job_id = str(uuid.uuid4())
-    jobs[job_id] = {"status": "running", "messages": [], "apkg_path": None, "error": None}
+    db.add(Job(id=job_id, status="running", messages_json="[]"))
+    db.commit()
 
+    # Save uploads to temp files
     tmp_paths = []
     for file in files:
         ext = Path(file.filename or "upload.tmp").suffix.lower()
@@ -183,10 +189,9 @@ def _run_pipeline(job_id, ip_address, file_paths,
                   anthropic_key,
                   deck_name, card_type, cards_per_chunk,
                   language, claude_model, tags):
-    job = jobs[job_id]
 
     def progress(msg: str):
-        job["messages"].append(msg)
+        _job_append_message(job_id, msg)
 
     try:
         apkg_path, usage_stats = generate_cards_from_file(
@@ -200,39 +205,58 @@ def _run_pipeline(job_id, ip_address, file_paths,
             tags=tags,
             progress=progress,
         )
-        job["apkg_path"] = apkg_path
-        job["status"] = "done"
-        job["messages"].append("__DONE__")
 
-        # Log cost (non-fatal)
+        # Read apkg bytes and store in DB so download survives restarts
+        with open(apkg_path, "rb") as f:
+            apkg_data = f.read()
         try:
-            db = SessionLocal()
-            try:
-                db.add(GenerationLog(
-                    ip_address=ip_address,
-                    estimated_cost_usd=usage_stats["estimated_cost_usd"],
-                    input_tokens=usage_stats["input_tokens"],
-                    output_tokens=usage_stats["output_tokens"],
-                    model=usage_stats["model"],
-                ))
-                m = current_month()
-                monthly = db.query(GlobalUsage).filter(GlobalUsage.month == m).first()
-                if not monthly:
-                    monthly = GlobalUsage(month=m, estimated_cost_usd=0.0, generation_count=0)
-                    db.add(monthly)
-                monthly.estimated_cost_usd = (monthly.estimated_cost_usd or 0) + usage_stats["estimated_cost_usd"]
-                monthly.generation_count   = (monthly.generation_count or 0) + 1
-                monthly.updated_at         = datetime.datetime.utcnow()
-                db.commit()
-            finally:
-                db.close()
-        except Exception as cost_err:
-            print(f"[cost logging error] {cost_err}")
+            os.remove(apkg_path)
+        except OSError:
+            pass
+
+        db = SessionLocal()
+        try:
+            job = db.query(Job).filter(Job.id == job_id).first()
+            if job:
+                msgs = json.loads(job.messages_json or "[]")
+                msgs.append("__DONE__")
+                job.messages_json = json.dumps(msgs)
+                job.status    = "done"
+                job.apkg_data = apkg_data
+            # Log cost
+            db.add(GenerationLog(
+                ip_address=ip_address,
+                estimated_cost_usd=usage_stats["estimated_cost_usd"],
+                input_tokens=usage_stats["input_tokens"],
+                output_tokens=usage_stats["output_tokens"],
+                model=usage_stats["model"],
+            ))
+            m = current_month()
+            monthly = db.query(GlobalUsage).filter(GlobalUsage.month == m).first()
+            if not monthly:
+                monthly = GlobalUsage(month=m, estimated_cost_usd=0.0, generation_count=0)
+                db.add(monthly)
+            monthly.estimated_cost_usd = (monthly.estimated_cost_usd or 0) + usage_stats["estimated_cost_usd"]
+            monthly.generation_count   = (monthly.generation_count or 0) + 1
+            monthly.updated_at         = datetime.datetime.utcnow()
+            db.commit()
+        finally:
+            db.close()
 
     except Exception as e:
-        job["status"] = "error"
-        job["error"] = str(e)
-        job["messages"].append(f"__ERROR__{e}")
+        print(f"[pipeline error] {e}")
+        db = SessionLocal()
+        try:
+            job = db.query(Job).filter(Job.id == job_id).first()
+            if job:
+                msgs = json.loads(job.messages_json or "[]")
+                msgs.append(f"__ERROR__{e}")
+                job.messages_json = json.dumps(msgs)
+                job.status = "error"
+                job.error  = str(e)
+                db.commit()
+        finally:
+            db.close()
     finally:
         for p in file_paths:
             try:
@@ -242,18 +266,18 @@ def _run_pipeline(job_id, ip_address, file_paths,
 
 
 # ---------------------------------------------------------------------------
-# SSE progress stream
+# Progress polling
 # ---------------------------------------------------------------------------
 
 @app.get("/api/progress/{job_id}")
-async def progress_stream(job_id: str):
-    if job_id not in jobs:
+def get_progress(job_id: str, db: Session = Depends(get_db)):
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    job = jobs[job_id]
     return {
-        "status":   job["status"],
-        "messages": job["messages"],
-        "error":    job["error"],
+        "status":   job.status,
+        "messages": json.loads(job.messages_json or "[]"),
+        "error":    job.error,
     }
 
 
@@ -262,16 +286,16 @@ async def progress_stream(job_id: str):
 # ---------------------------------------------------------------------------
 
 @app.get("/api/download/{job_id}")
-async def download_apkg(job_id: str):
-    if job_id not in jobs:
+def download_apkg(job_id: str, db: Session = Depends(get_db)):
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    job = jobs[job_id]
-    if job["status"] != "done" or not job["apkg_path"]:
+    if job.status != "done" or not job.apkg_data:
         raise HTTPException(status_code=400, detail="Job not complete")
-    return FileResponse(
-        path=job["apkg_path"],
-        filename="darwincards_deck.apkg",
+    return Response(
+        content=job.apkg_data,
         media_type="application/octet-stream",
+        headers={"Content-Disposition": "attachment; filename=darwincards_deck.apkg"},
     )
 
 
