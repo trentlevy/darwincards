@@ -710,7 +710,7 @@ function setOrbState(state) {
 // ─────────────────────────────────────────────
 // App logic
 // ─────────────────────────────────────────────
-let selectedFiles = [], eventSource = null, logLines = [];
+let selectedFiles = [], logLines = [];
 
 const FILE_META = {
   txt:  { icon: 'A', label: 'Transcript loaded', sub: 'Ready to generate', badge: 'txt'  },
@@ -820,29 +820,43 @@ async function startGeneration() {
     jobId = data.job_id;
   } catch (err) { showErr(err.message); return; }
 
-  eventSource = new EventSource(`/api/progress/${jobId}`);
-  eventSource.addEventListener('ping', () => {}); // keepalive — ignore
-  eventSource.onmessage = e => {
-    const msg = e.data;
-    if (msg.startsWith('__DONE__')) {
-      eventSource.close(); markLastDone();
-      setOrbState('done');
-      document.getElementById('orb-icon').textContent  = '✓';
-      document.getElementById('orb-title').textContent = 'Deck ready!';
-      document.getElementById('orb-sub').textContent   = 'Download below';
-      document.getElementById('orb-file-name').textContent = '';
-      document.getElementById('progress-section').style.display = 'none';
-      document.getElementById('download-btn').href = `/api/download/${jobId}`;
-      document.getElementById('download-section').style.display = 'block';
-      document.getElementById('download-section').scrollIntoView({behavior:'smooth'});
-      document.getElementById('generate-btn').disabled = false;
-    } else if (msg.startsWith('__ERROR__')) {
-      eventSource.close(); showErr(msg.replace('__ERROR__',''));
-    } else {
-      addLog(msg);
+  // Poll for progress every 2s (more reliable than SSE through Railway's proxy)
+  let seen = 0;
+  async function poll() {
+    try {
+      const r = await fetch(`/api/progress/${jobId}`);
+      if (!r.ok) { showErr('Lost connection to server.'); return; }
+      const d = await r.json();
+      const msgs = d.messages || [];
+      for (let i = seen; i < msgs.length; i++) {
+        const msg = msgs[i];
+        if (msg.startsWith('__DONE__')) {
+          markLastDone();
+          setOrbState('done');
+          document.getElementById('orb-icon').textContent  = '✓';
+          document.getElementById('orb-title').textContent = 'Deck ready!';
+          document.getElementById('orb-sub').textContent   = 'Download below';
+          document.getElementById('orb-file-name').textContent = '';
+          document.getElementById('progress-section').style.display = 'none';
+          document.getElementById('download-btn').href = `/api/download/${jobId}`;
+          document.getElementById('download-section').style.display = 'block';
+          document.getElementById('download-section').scrollIntoView({behavior:'smooth'});
+          document.getElementById('generate-btn').disabled = false;
+          return;
+        } else if (msg.startsWith('__ERROR__')) {
+          showErr(msg.replace('__ERROR__', '')); return;
+        } else {
+          addLog(msg);
+        }
+      }
+      seen = msgs.length;
+      if (d.status === 'running') setTimeout(poll, 2000);
+      else if (d.status === 'error') showErr(d.error || 'Unknown error');
+    } catch (err) {
+      showErr('Lost connection to server.');
     }
-  };
-  eventSource.onerror = () => eventSource.close();
+  }
+  setTimeout(poll, 1000);
 }
 
 function showLimit(title, msg) {

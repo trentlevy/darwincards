@@ -26,7 +26,6 @@ from typing import Dict, Any, List
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Depends, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from sse_starlette.sse import EventSourceResponse
 from sqlalchemy.orm import Session
 
 from database import Base, engine, get_db, SessionLocal
@@ -250,34 +249,12 @@ def _run_pipeline(job_id, ip_address, file_paths,
 async def progress_stream(job_id: str):
     if job_id not in jobs:
         raise HTTPException(status_code=404, detail="Job not found")
-
-    async def event_generator():
-        sent = 0
-        last_ping = asyncio.get_event_loop().time()
-        while True:
-            job = jobs[job_id]
-            messages = job["messages"]
-            while sent < len(messages):
-                msg = messages[sent]
-                sent += 1
-                yield {"data": msg}
-                last_ping = asyncio.get_event_loop().time()
-                if msg.startswith("__DONE__") or msg.startswith("__ERROR__"):
-                    return
-            if job["status"] in ("done", "error") and sent >= len(messages):
-                return
-            # Send a keepalive ping every 10s — Railway's nginx proxy drops
-            # idle SSE connections; X-Accel-Buffering: no disables buffering.
-            now = asyncio.get_event_loop().time()
-            if now - last_ping > 10:
-                yield {"event": "ping", "data": ""}
-                last_ping = now
-            await asyncio.sleep(0.5)
-
-    return EventSourceResponse(
-        event_generator(),
-        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
-    )
+    job = jobs[job_id]
+    return {
+        "status":   job["status"],
+        "messages": job["messages"],
+        "error":    job["error"],
+    }
 
 
 # ---------------------------------------------------------------------------
