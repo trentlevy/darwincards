@@ -33,22 +33,51 @@ TEXT_EXTS  = {".txt"}
 ALLOWED_EXTS = SLIDE_EXTS | TEXT_EXTS
 
 SYSTEM_PROMPT = """\
-You are a medical education expert who creates high-quality Anki flashcards \
-from lecture content. Your cards follow best practices:
+You are a medical education expert who creates high-yield Anki flashcards in the style of AnKing.
+
+Rules:
 - One concept per card (minimum information principle)
-- Clear, unambiguous questions
-- Answers that are concise but complete
-- Cloze cards use {{c1::...}} syntax around the key term(s)
+- Prefer CLOZE cards for facts, definitions, mechanisms, and values — they are more effective for memorization
+- Use BASIC cards for "what/why/how" questions that need a full explanation
+- Cloze syntax: {{c1::term}} for the key fact. Use {{c2::...}} for a second blank on the same card only when the two facts are closely linked
+- Cloze "back" (Extra) field: add a brief explanation or clinical pearl to reinforce the answer
+- Keep answers concise — one to two sentences max
+- Focus on high-yield: mechanisms, drug classes, classic presentations, values, pathophysiology
 
 You MUST respond with valid JSON only — no prose, no markdown fences.
 The JSON should be an array of card objects, each with:
   "type"  : "basic" or "cloze"
-  "front" : question string (or cloze-formatted string for cloze cards)
-  "back"  : answer / extra context string
+  "front" : question (basic) or sentence with {{c1::...}} blanks (cloze)
+  "back"  : answer (basic) or extra context / clinical pearl (cloze)
 """
 
 BASIC_MODEL_ID = 1607392319
 CLOZE_MODEL_ID = 1607392320
+
+_CARD_CSS = """
+.card {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 20px;
+  line-height: 1.6;
+  color: #1a1a1a;
+  background: #ffffff;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 24px 28px;
+  text-align: center;
+}
+.front { font-size: 22px; font-weight: 500; }
+hr#answer { border: none; border-top: 2px solid #e0e0e0; margin: 20px 0; }
+.back { font-size: 20px; color: #1a1a1a; }
+.extra {
+  font-size: 15px; color: #555; margin-top: 14px;
+  padding-top: 12px; border-top: 1px solid #eee;
+  text-align: left;
+}
+/* Cloze */
+.cloze { font-weight: bold; color: #0070f3; }
+.cloze b { font-weight: bold; color: #0070f3; }
+"""
 
 BASIC_MODEL = genanki.Model(
     BASIC_MODEL_ID,
@@ -56,9 +85,10 @@ BASIC_MODEL = genanki.Model(
     fields=[{"name": "Front"}, {"name": "Back"}],
     templates=[{
         "name": "Card 1",
-        "qfmt": "{{Front}}",
-        "afmt": "{{FrontSide}}<hr id=answer>{{Back}}",
+        "qfmt": '<div class="front">{{Front}}</div>',
+        "afmt": '<div class="front">{{Front}}</div><hr id=answer><div class="back">{{Back}}</div>',
     }],
+    css=_CARD_CSS,
 )
 
 CLOZE_MODEL = genanki.Model(
@@ -67,10 +97,11 @@ CLOZE_MODEL = genanki.Model(
     fields=[{"name": "Text"}, {"name": "Extra"}],
     templates=[{
         "name": "Cloze",
-        "qfmt": "{{cloze:Text}}",
-        "afmt": "{{cloze:Text}}<br><br>{{Extra}}",
+        "qfmt": '<div class="front">{{cloze:Text}}</div>',
+        "afmt": '<div class="front">{{cloze:Text}}</div><div class="extra">{{Extra}}</div>',
     }],
     model_type=genanki.Model.CLOZE,
+    css=_CARD_CSS,
 )
 
 
