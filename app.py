@@ -253,6 +253,7 @@ async def progress_stream(job_id: str):
 
     async def event_generator():
         sent = 0
+        last_ping = asyncio.get_event_loop().time()
         while True:
             job = jobs[job_id]
             messages = job["messages"]
@@ -260,10 +261,17 @@ async def progress_stream(job_id: str):
                 msg = messages[sent]
                 sent += 1
                 yield {"data": msg}
+                last_ping = asyncio.get_event_loop().time()
                 if msg.startswith("__DONE__") or msg.startswith("__ERROR__"):
                     return
             if job["status"] in ("done", "error") and sent >= len(messages):
                 return
+            # Send a keepalive ping every 15s to prevent Railway's proxy from
+            # closing the SSE connection during long generations
+            now = asyncio.get_event_loop().time()
+            if now - last_ping > 15:
+                yield {"comment": "keepalive"}
+                last_ping = now
             await asyncio.sleep(0.5)
 
     return EventSourceResponse(event_generator())
