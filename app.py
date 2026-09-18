@@ -133,6 +133,7 @@ async def start_generation(
     deck_name: str = Form("DarwinCards"),
     card_type: str = Form("both"),
     image_occlusion: str = Form("true"),
+    auto_tags: str = Form("true"),
     cards_per_chunk: int = Form(8),
     language: str = Form("en"),
     claude_model: str = Form("claude-sonnet-4-6"),
@@ -179,7 +180,9 @@ async def start_generation(
         None, _run_pipeline,
         job_id, ip, tmp_paths,
         ANTHROPIC_API_KEY,
-        deck_name, card_type, image_occlusion.lower() == "true",
+        deck_name, card_type,
+        image_occlusion.lower() == "true",
+        auto_tags.lower() == "true",
         cards_per_chunk, language, claude_model, tag_list,
     )
 
@@ -188,7 +191,7 @@ async def start_generation(
 
 def _run_pipeline(job_id, ip_address, file_paths,
                   anthropic_key,
-                  deck_name, card_type, include_images,
+                  deck_name, card_type, include_images, auto_tags,
                   cards_per_chunk, language, claude_model, tags):
 
     def progress(msg: str):
@@ -201,6 +204,7 @@ def _run_pipeline(job_id, ip_address, file_paths,
             deck_name=deck_name,
             card_type=card_type,
             include_images=include_images,
+            auto_tags=auto_tags,
             cards_per_chunk=cards_per_chunk,
             language=language,
             claude_model=claude_model,

@@ -168,6 +168,7 @@ def generate_cards_from_file(
     deck_name: str = "DarwinCards",
     card_type: str = "both",
     include_images: bool = True,
+    auto_tags: bool = True,
     cards_per_chunk: int = 8,
     language: str = "en",
     claude_model: str = "claude-sonnet-4-6",
@@ -232,6 +233,17 @@ def generate_cards_from_file(
                 except Exception as e:
                     progress(f"Image extraction skipped: {e}")
 
+    # Auto-generate subject tags with Claude
+    if auto_tags:
+        try:
+            progress("Auto-tagging with AI…")
+            ai_tags, at_in, at_out = _generate_tags(transcript, anthropic_api_key, claude_model)
+            tags = list(dict.fromkeys((tags or []) + ai_tags))  # merge, dedupe, preserve order
+            input_tokens  += at_in
+            output_tokens += at_out
+        except Exception as e:
+            progress(f"Auto-tagging skipped: {e}")
+
     all_cards = cards + image_cards
     progress(f"Building .apkg deck with {len(all_cards)} card(s) ({len(image_cards)} image)…")
     apkg_path = _build_apkg(all_cards, deck_name, tags)
@@ -272,6 +284,42 @@ def _extract_pptx_text(pptx_path: str) -> str:
         if texts:
             slides.append("\n".join(texts))
     return "\n\n---\n\n".join(slides)
+
+
+# ---------------------------------------------------------------------------
+# Auto-tagging
+# ---------------------------------------------------------------------------
+
+def _generate_tags(transcript: str, api_key: str, model: str) -> Tuple[List[str], int, int]:
+    """Ask Claude to suggest 3-8 Anki tags for the content."""
+    client = anthropic.Anthropic(api_key=api_key)
+    # Trim transcript to keep cost minimal
+    snippet = transcript[:4000]
+    resp = client.messages.create(
+        model=model,
+        max_tokens=128,
+        messages=[{
+            "role": "user",
+            "content": (
+                "You are a medical educator tagging Anki flashcard decks for US med students.\n"
+                "Given the lecture excerpt below, reply with ONLY a JSON array of 3-8 lowercase "
+                "single-word or hyphenated tags (e.g. [\"cardiology\", \"step1\", \"pharmacology\"]).\n"
+                "No explanation — just the JSON array.\n\n"
+                f"EXCERPT:\n{snippet}"
+            ),
+        }],
+    )
+    raw = resp.content[0].text.strip()
+    # Parse the JSON array; fall back gracefully
+    import re as _re
+    match = _re.search(r'\[.*?\]', raw, _re.DOTALL)
+    if match:
+        import json as _json
+        ai_tags = _json.loads(match.group())
+        ai_tags = [t.lower().replace(" ", "-") for t in ai_tags if isinstance(t, str)][:8]
+    else:
+        ai_tags = []
+    return ai_tags, resp.usage.input_tokens, resp.usage.output_tokens
 
 
 # ---------------------------------------------------------------------------

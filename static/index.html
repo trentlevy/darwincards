@@ -469,22 +469,27 @@
           <div class="thumb"></div>
         </label>
       </div>
+      <div class="toggle-row">
+        <div class="toggle-label">
+          <span>Auto-Tag with AI</span>
+          <small>Claude adds subject tags (cardiology, pharmacology…)</small>
+        </div>
+        <label class="ios-toggle">
+          <input type="checkbox" id="auto-tags" checked />
+          <div class="track"></div>
+          <div class="thumb"></div>
+        </label>
+      </div>
       <hr class="divider" />
       <details>
         <summary>Advanced options</summary>
-        <div class="two-col" style="margin-top:.8rem">
-          <div class="form-row">
-            <label>Language</label>
-            <input type="text" id="language" value="en" style="max-width:80px" />
-          </div>
-          <div class="form-row">
-            <label>Claude Model</label>
-            <select id="claude-model">
-              <option value="claude-opus-4-6">Opus (best)</option>
-              <option value="claude-sonnet-4-6">Sonnet (fast)</option>
-              <option value="claude-haiku-4-5-20251001">Haiku (fastest)</option>
-            </select>
-          </div>
+        <div class="form-row" style="margin-top:.8rem">
+          <label>Claude Model</label>
+          <select id="claude-model">
+            <option value="claude-opus-4-6">Opus (best)</option>
+            <option value="claude-sonnet-4-6">Sonnet (fast)</option>
+            <option value="claude-haiku-4-5-20251001">Haiku (fastest)</option>
+          </select>
         </div>
         <div class="form-row">
           <label>Tags</label>
@@ -812,7 +817,8 @@ async function startGeneration() {
   fd.append('card_type',        document.getElementById('card-type').value || 'both');
   fd.append('image_occlusion',  document.getElementById('image-occlusion').checked ? 'true' : 'false');
   fd.append('cards_per_chunk', '8');
-  fd.append('language',        document.getElementById('language').value || 'en');
+  fd.append('language',        'en');
+  fd.append('auto_tags',       document.getElementById('auto-tags').checked ? 'true' : 'false');
   fd.append('claude_model',    document.getElementById('claude-model').value);
   fd.append('tags',            document.getElementById('tags').value);
 
