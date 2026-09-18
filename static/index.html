@@ -722,11 +722,12 @@ function orbDragOver(e)  { e.preventDefault(); document.getElementById('orb').st
 function orbDragLeave(e) { document.getElementById('orb').style.transform = ''; }
 function orbDrop(e) {
   e.preventDefault(); document.getElementById('orb').style.transform = '';
-  if (e.dataTransfer.files.length) selectFiles(Array.from(e.dataTransfer.files));
+  if (e.dataTransfer.files.length) addFiles(Array.from(e.dataTransfer.files));
 }
 
 document.getElementById('file-input').addEventListener('change', e => {
-  if (e.target.files.length) selectFiles(Array.from(e.target.files));
+  if (e.target.files.length) addFiles(Array.from(e.target.files));
+  e.target.value = ''; // reset so the same file can be re-picked
 });
 
 function getType(name) {
@@ -752,6 +753,14 @@ function spawnOrbitChips(files) {
     chip.style.setProperty('--orbit-offset', `${offsets[i % offsets.length]}s`);
     orbWrap.appendChild(chip);
   });
+}
+
+function addFiles(newFiles) {
+  const valid = newFiles.filter(f => /\.(txt|pdf|pptx|ppt)$/i.test(f.name));
+  // Merge with existing, deduplicating by name
+  const existing = new Map(selectedFiles.map(f => [f.name, f]));
+  valid.forEach(f => existing.set(f.name, f));
+  selectFiles(Array.from(existing.values()));
 }
 
 function selectFiles(files) {
@@ -861,6 +870,7 @@ function showErr(msg) {
   document.getElementById('generate-btn').disabled = false;
 }
 function resetOrbLabel() {
+  selectedFiles = [];
   document.querySelectorAll('.orbit-chip').forEach(c => c.remove());
   document.getElementById('orb-icon').textContent  = '↑';
   document.getElementById('orb-title').textContent = 'Drop your lectures here';
