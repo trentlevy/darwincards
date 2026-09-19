@@ -57,6 +57,53 @@
       border: 1px solid rgba(37,99,235,.18);
       border-radius: 999px; padding: .2rem .7rem;
     }
+    .tb-about {
+      font-size: .78rem; font-weight: 500;
+      color: var(--text-muted);
+      background: none; border: none; cursor: pointer;
+      padding: .2rem .5rem; border-radius: 6px;
+      transition: color .15s, background .15s;
+    }
+    .tb-about:hover { color: var(--text); background: rgba(0,0,0,.05); }
+
+    /* ── About modal ── */
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.35); backdrop-filter: blur(4px);
+      z-index: 1000; align-items: center; justify-content: center;
+      padding: 1rem;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: #fff; border-radius: 18px;
+      max-width: 520px; width: 100%;
+      box-shadow: 0 24px 64px rgba(0,0,0,.18), 0 4px 16px rgba(0,0,0,.08);
+      overflow: hidden; animation: modalIn .2s cubic-bezier(.34,1.56,.64,1);
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(.94) translateY(8px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.2rem 1.4rem 0;
+    }
+    .modal-title { font-size: 1rem; font-weight: 700; color: #1d1d1f; }
+    .modal-close {
+      background: rgba(0,0,0,.06); border: none; cursor: pointer;
+      width: 28px; height: 28px; border-radius: 50%;
+      font-size: .95rem; color: #555; display: flex; align-items: center; justify-content: center;
+      transition: background .15s;
+    }
+    .modal-close:hover { background: rgba(0,0,0,.12); }
+    .modal-body { padding: 1rem 1.4rem 1.5rem; }
+    .modal-body p {
+      font-size: .88rem; color: #3a3a3c; line-height: 1.7;
+      margin-bottom: .9rem;
+    }
+    .modal-body p:last-child { margin-bottom: 0; }
+    .modal-body a { color: #2563eb; text-decoration: none; }
+    .modal-body a:hover { text-decoration: underline; }
 
     /* Capacity banner */
     #capacity-banner {
@@ -363,10 +410,28 @@
   DarwinCards has hit its monthly limit. Check back next month.
 </div>
 
+<!-- About modal -->
+<div class="modal-backdrop" id="about-modal" onclick="closeAbout(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">About DarwinCards</span>
+      <button class="modal-close" onclick="document.getElementById('about-modal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <img src="/static/darwin.jpg" alt="Darwin the cat" style="width:100px;height:100px;border-radius:50%;object-fit:cover;object-position:center top;display:block;margin:0 auto 1rem;box-shadow:0 2px 12px rgba(0,0,0,.12);" />
+      <p>Hi — I'm Trent, a medical resident who built DarwinCards because the Anki decks from public resources like AnKing weren't adaptive to the actual content of my preclinical curriculum. They're great for boards review, but when you're sitting in a lecture on your school's specific material, you need cards that reflect <em>what your professor actually taught</em>.</p>
+      <p>DarwinCards is designed for <strong>MS1s and MS2s</strong> — upload a transcript, PDF slides, or PowerPoint from your lecture and get a custom Anki deck in under a minute. It's most useful for studying for shelf exams, Step 1, and Step 2 CK, where tying your lecture content to high-yield concepts really matters.</p>
+      <p>I plan to keep this tool <strong>free</strong> and self-fund it for as long as I can. If you have suggestions on how to sustain it, or if you'd like to contribute, feel free to reach out — I'd love to hear from you: <a href="mailto:trentlevy123@gmail.com">trentlevy123@gmail.com</a></p>
+      <p style="font-size:.8rem; color:#888; margin-bottom:0">P.S. DarwinCards is named after my cat, Darwin. 🐾</p>
+    </div>
+  </div>
+</div>
+
 <!-- Top bar -->
 <div class="topbar">
   <div class="logo">DarwinCards</div>
   <div class="topbar-right">
+    <button class="tb-about" onclick="document.getElementById('about-modal').classList.add('open')">About</button>
     <span class="tb-tag">Free to use</span>
   </div>
 </div>
@@ -920,6 +985,10 @@ function resetOrbLabel() {
   document.getElementById('orb-title').textContent = 'Drop your lectures here';
   document.getElementById('orb-sub').textContent   = 'or click to browse — combine multiple files';
   document.getElementById('orb-file-name').textContent = '';
+}
+function closeAbout(e) {
+  if (e.target === document.getElementById('about-modal'))
+    document.getElementById('about-modal').classList.remove('open');
 }
 function restart() {
   selectedFiles = [];
