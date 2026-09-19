@@ -137,7 +137,8 @@ async def start_generation(
     cards_per_chunk: int = Form(8),
     language: str = Form("en"),
     claude_model: str = Form("claude-sonnet-4-6"),
-    tags: str = Form(""),
+    course: str = Form(""),
+    lecture_topic: str = Form(""),
     db: Session = Depends(get_db),
 ):
     if not ANTHROPIC_API_KEY:
@@ -173,7 +174,6 @@ async def start_generation(
         tmp.close()
         tmp_paths.append(tmp.name)
 
-    tag_list = [t.strip() for t in tags.split() if t.strip()]
 
     loop = asyncio.get_event_loop()
     loop.run_in_executor(
@@ -183,7 +183,7 @@ async def start_generation(
         deck_name, card_type,
         image_occlusion.lower() == "true",
         auto_tags.lower() == "true",
-        cards_per_chunk, language, claude_model, tag_list,
+        cards_per_chunk, language, claude_model, course, lecture_topic,
     )
 
     return {"job_id": job_id}
@@ -192,7 +192,7 @@ async def start_generation(
 def _run_pipeline(job_id, ip_address, file_paths,
                   anthropic_key,
                   deck_name, card_type, include_images, auto_tags,
-                  cards_per_chunk, language, claude_model, tags):
+                  cards_per_chunk, language, claude_model, course, lecture_topic):
 
     def progress(msg: str):
         _job_append_message(job_id, msg)
@@ -208,7 +208,8 @@ def _run_pipeline(job_id, ip_address, file_paths,
             cards_per_chunk=cards_per_chunk,
             language=language,
             claude_model=claude_model,
-            tags=tags,
+            course=course,
+            lecture_topic=lecture_topic,
             progress=progress,
         )
 

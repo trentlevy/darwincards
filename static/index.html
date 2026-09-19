@@ -481,6 +481,16 @@
         </label>
       </div>
       <hr class="divider" />
+      <div class="two-col">
+        <div class="form-row">
+          <label>Course</label>
+          <input type="text" id="course" placeholder="e.g. Cardiology" />
+        </div>
+        <div class="form-row">
+          <label>Lecture Topic</label>
+          <input type="text" id="lecture-topic" placeholder="e.g. Heart Failure" />
+        </div>
+      </div>
       <details>
         <summary>Advanced options</summary>
         <div class="form-row" style="margin-top:.8rem">
@@ -490,10 +500,6 @@
             <option value="claude-sonnet-4-6">Sonnet (fast)</option>
             <option value="claude-haiku-4-5-20251001">Haiku (fastest)</option>
           </select>
-        </div>
-        <div class="form-row">
-          <label>Tags</label>
-          <input type="text" id="tags" placeholder="cardiology step1 week3" />
         </div>
       </details>
     </div>
@@ -820,7 +826,8 @@ async function startGeneration() {
   fd.append('language',        'en');
   fd.append('auto_tags',       document.getElementById('auto-tags').checked ? 'true' : 'false');
   fd.append('claude_model',    document.getElementById('claude-model').value);
-  fd.append('tags',            document.getElementById('tags').value);
+  fd.append('course',          document.getElementById('course').value);
+  fd.append('lecture_topic',   document.getElementById('lecture-topic').value);
 
   let jobId;
   try {

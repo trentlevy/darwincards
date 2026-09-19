@@ -162,6 +162,15 @@ def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
     return (input_tokens / 1_000_000) * rates["input"] + (output_tokens / 1_000_000) * rates["output"]
 
 
+def _slugify(text: str) -> str:
+    """Convert a label to a safe Anki tag segment (no spaces, no special chars)."""
+    import re as _re
+    text = text.strip()
+    text = _re.sub(r'[^\w\s-]', '', text)   # strip special chars
+    text = _re.sub(r'[\s]+', '-', text)       # spaces → hyphens
+    return text or "Unknown"
+
+
 def generate_cards_from_file(
     file_paths,
     anthropic_api_key: str,
@@ -172,7 +181,8 @@ def generate_cards_from_file(
     cards_per_chunk: int = 8,
     language: str = "en",
     claude_model: str = "claude-sonnet-4-6",
-    tags: List[str] = None,
+    course: str = "",
+    lecture_topic: str = "",
     progress: Callable[[str], None] = lambda _: None,
 ) -> tuple:
     """
@@ -180,7 +190,15 @@ def generate_cards_from_file(
     Multiple files are merged into a single transcript before card generation.
     Returns (apkg_path, usage_stats).
     """
-    tags = tags or []
+    # Build hierarchical tag base: DeckName::Course::LectureTopic
+    root = _slugify(deck_name)
+    tag_parts = [root]
+    if course.strip():
+        tag_parts.append(_slugify(course))
+    if lecture_topic.strip():
+        tag_parts.append(_slugify(lecture_topic))
+    tag_base = "::".join(tag_parts)
+    tags = [tag_base]
     if isinstance(file_paths, str):
         file_paths = [file_paths]
 
@@ -233,12 +251,14 @@ def generate_cards_from_file(
                 except Exception as e:
                     progress(f"Image extraction skipped: {e}")
 
-    # Auto-generate subject tags with Claude
+    # Auto-generate subject tags with Claude — nested under the base path
     if auto_tags:
         try:
             progress("Auto-tagging with AI…")
             ai_tags, at_in, at_out = _generate_tags(transcript, anthropic_api_key, claude_model)
-            tags = list(dict.fromkeys((tags or []) + ai_tags))  # merge, dedupe, preserve order
+            # Each AI tag becomes DeckName::Course::LectureTopic::ai-tag
+            nested = [f"{tag_base}::{t}" for t in ai_tags]
+            tags = list(dict.fromkeys(tags + nested))
             input_tokens  += at_in
             output_tokens += at_out
         except Exception as e:
