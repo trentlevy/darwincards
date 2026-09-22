@@ -61,3 +61,19 @@ class Job(Base):
     apkg_data    = Column(LargeBinary, nullable=True)  # completed .apkg bytes
     error        = Column(String, nullable=True)
     created_at   = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class NoteChunk(Base):
+    """
+    A chunk of a school's "shared drive" corpus — prior years' student notes
+    on lectures, recycled class to class. Retrieved at generation time to
+    ground card generation in what past students found worth writing down.
+    """
+    __tablename__ = "note_chunks"
+    id          = Column(Integer, primary_key=True, index=True)
+    school      = Column(String, index=True)    # e.g. "Perelman School of Medicine"
+    source_doc  = Column(String, index=True)    # original filename/label — re-ingest replaces by this key
+    heading     = Column(String, nullable=True) # nearest section/lecture heading, if the source had one
+    chunk_index = Column(Integer, default=0)
+    chunk_text  = Column(Text)
+    created_at  = Column(DateTime, default=datetime.datetime.utcnow)

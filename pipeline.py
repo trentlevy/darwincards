@@ -183,6 +183,7 @@ def generate_cards_from_file(
     claude_model: str = "claude-sonnet-4-6",
     course: str = "",
     lecture_topic: str = "",
+    school: str = "Perelman School of Medicine",
     progress: Callable[[str], None] = lambda _: None,
 ) -> tuple:
     """
@@ -227,10 +228,25 @@ def generate_cards_from_file(
     # Merge all sources with a clear divider so Claude sees them as one body of material
     transcript = "\n\n━━━ NEW SOURCE ━━━\n\n".join(sections)
 
+    # Pull in matching excerpts from this school's prior-years' student notes
+    # (if any have been ingested) to help Claude gauge what's historically
+    # high-yield for this topic, alongside the actual lecture content.
+    reference_notes: List[str] = []
+    if school:
+        try:
+            from notes_corpus import retrieve_relevant_notes
+            query = f"{course} {lecture_topic}\n{transcript[:1000]}"
+            reference_notes = retrieve_relevant_notes(query, school=school, top_k=4)
+            if reference_notes:
+                progress(f"Found {len(reference_notes)} relevant excerpt(s) from prior student notes…")
+        except Exception as e:
+            progress(f"Reference notes lookup skipped: {e}")
+
     progress("Generating Anki cards with Claude…")
     cards, input_tokens, output_tokens = _generate_cards(
         transcript, anthropic_api_key, card_type,
         cards_per_chunk, claude_model, progress,
+        reference_notes=reference_notes,
     )
 
     # Extract images from slide files and generate image-based cards
@@ -435,13 +451,27 @@ def _generate_image_cards(
 # Claude card generation
 # ---------------------------------------------------------------------------
 
-def _generate_cards(transcript, api_key, card_type, cards_per_chunk, model, progress):
+def _generate_cards(transcript, api_key, card_type, cards_per_chunk, model, progress, reference_notes: Optional[List[str]] = None):
     client = anthropic.Anthropic(api_key=api_key)
     type_instruction = {
         "both":  "Generate a mix of 'basic' (Q&A) and 'cloze' (fill-in-the-blank) cards.",
         "basic": "Generate only 'basic' (Q&A) cards.",
         "cloze": "Generate only 'cloze' (fill-in-the-blank) cards.",
     }[card_type]
+
+    reference_block = ""
+    if reference_notes:
+        joined = "\n\n---\n\n".join(reference_notes)
+        reference_block = (
+            "\n\nREFERENCE — excerpts from prior years' student notes on related topics at this school, "
+            "found via keyword search and NOT guaranteed to be on-topic. These reflect what past students "
+            "found worth writing down (and, by extension, what tends to get tested). Use them only to gauge "
+            "emphasis and catch high-yield points the lecture content implies but doesn't spell out — the "
+            "CONTENT above is authoritative for facts, do not copy the reference wording verbatim, and if an "
+            "excerpt turns out to be about a different topic than the lecture (keyword search can surface "
+            "tangential matches), ignore it entirely rather than forcing a connection:\n"
+            f"{joined}"
+        )
 
     chunks = _chunk_text(transcript, WORDS_PER_CHUNK)
     all_cards = []
@@ -455,6 +485,7 @@ def _generate_cards(transcript, api_key, card_type, cards_per_chunk, model, prog
             f"Generate up to {cards_per_chunk} cards from the following lecture content. "
             f"Focus on high-yield medical facts, mechanisms, definitions, and clinical pearls.\n\n"
             f"CONTENT:\n{chunk}"
+            f"{reference_block}"
         )
         resp = client.messages.create(
             model=model, max_tokens=4096,

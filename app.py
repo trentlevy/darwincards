@@ -139,6 +139,7 @@ async def start_generation(
     claude_model: str = Form("claude-sonnet-4-6"),
     course: str = Form(""),
     lecture_topic: str = Form(""),
+    school: str = Form("Perelman School of Medicine"),
     db: Session = Depends(get_db),
 ):
     if not ANTHROPIC_API_KEY:
@@ -183,7 +184,7 @@ async def start_generation(
         deck_name, card_type,
         image_occlusion.lower() == "true",
         auto_tags.lower() == "true",
-        cards_per_chunk, language, claude_model, course, lecture_topic,
+        cards_per_chunk, language, claude_model, course, lecture_topic, school,
     )
 
     return {"job_id": job_id}
@@ -192,7 +193,7 @@ async def start_generation(
 def _run_pipeline(job_id, ip_address, file_paths,
                   anthropic_key,
                   deck_name, card_type, include_images, auto_tags,
-                  cards_per_chunk, language, claude_model, course, lecture_topic):
+                  cards_per_chunk, language, claude_model, course, lecture_topic, school):
 
     def progress(msg: str):
         _job_append_message(job_id, msg)
@@ -210,6 +211,7 @@ def _run_pipeline(job_id, ip_address, file_paths,
             claude_model=claude_model,
             course=course,
             lecture_topic=lecture_topic,
+            school=school,
             progress=progress,
         )
 
