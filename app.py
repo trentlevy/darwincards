@@ -138,7 +138,7 @@ async def start_generation(
     card_type: str = Form("both"),
     image_occlusion: str = Form("true"),
     auto_tags: str = Form("true"),
-    cards_per_chunk: int = Form(8),
+    cards_per_chunk: int = Form(15),  # safety ceiling per section — Claude decides the actual count
     language: str = Form("en"),
     claude_model: str = Form("claude-sonnet-4-6"),
     course: str = Form(""),

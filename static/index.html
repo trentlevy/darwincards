@@ -426,8 +426,6 @@
       display: flex; flex-direction: column;
       cursor: grab;
       min-height: 300px;
-      max-height: 70vh;
-      overflow-y: auto;
     }
     .review-card:active { cursor: grabbing; }
     .review-question, .review-answer {
@@ -978,7 +976,7 @@ async function startGeneration() {
   fd.append('deck_name',       document.getElementById('deck-name').value || 'DarwinCards');
   fd.append('card_type',        document.getElementById('card-type').value || 'both');
   fd.append('image_occlusion',  document.getElementById('image-occlusion').checked ? 'true' : 'false');
-  fd.append('cards_per_chunk', '8');
+  fd.append('cards_per_chunk', '15');
   fd.append('language',        'en');
   fd.append('auto_tags',       document.getElementById('auto-tags').checked ? 'true' : 'false');
   fd.append('claude_model',    document.getElementById('claude-model').value);

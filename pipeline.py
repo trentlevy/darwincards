@@ -46,6 +46,12 @@ Rules:
 - Cloze "back" (Extra) field: add a brief explanation or clinical pearl to reinforce the answer
 - Keep answers concise — one to two sentences max
 - Focus on high-yield: mechanisms, drug classes, classic presentations, values, pathophysiology
+- Decide the NUMBER of cards yourself, per section of content, based on how much is actually
+  high-yield and testable — never pad to hit a target count, and never skip a genuinely
+  high-yield fact to stay under one. A section that's mostly administrative framing, a story,
+  or repetition of an already-covered point can honestly warrant zero cards; a section dense
+  with distinct testable facts can warrant more than a "typical" section. Quality and
+  non-redundancy over quantity — a student reviewing this deck should not hit filler.
 
 You MUST respond with valid JSON only — no prose, no markdown fences.
 The JSON should be an array of card objects, each with:
@@ -193,7 +199,7 @@ def generate_cards_from_file(
     card_type: str = "both",
     include_images: bool = True,
     auto_tags: bool = True,
-    cards_per_chunk: int = 8,
+    cards_per_chunk: int = 15,  # safety ceiling per ~1500-word section, not a target — see _generate_cards
     language: str = "en",
     claude_model: str = "claude-sonnet-4-6",
     course: str = "",
@@ -494,11 +500,14 @@ def _generate_cards(transcript, api_key, card_type, cards_per_chunk, model, prog
         reference_block = (
             "\n\nREFERENCE — excerpts from prior years' student notes on related topics at this school, "
             "found via keyword search and NOT guaranteed to be on-topic. These reflect what past students "
-            "found worth writing down (and, by extension, what tends to get tested). Use them only to gauge "
-            "emphasis and catch high-yield points the lecture content implies but doesn't spell out — the "
-            "CONTENT above is authoritative for facts, do not copy the reference wording verbatim, and if an "
-            "excerpt turns out to be about a different topic than the lecture (keyword search can surface "
-            "tangential matches), ignore it entirely rather than forcing a connection:\n"
+            "found worth writing down (and, by extension, what tends to get tested). Use them as a relevancy "
+            "signal for HOW MANY cards this content deserves, not just their wording: if these notes show past "
+            "students flagged a point as worth writing down or testing, that's a signal to make a card for it "
+            "even if the lecture only mentions it briefly; if a lecture passage reads as filler/administrative "
+            "and nothing here corroborates it as commonly tested, that's a signal to skip it rather than force a "
+            "card. The CONTENT above is authoritative for facts — do not copy the reference wording verbatim — "
+            "and if an excerpt turns out to be about a different topic than the lecture (keyword search can "
+            "surface tangential matches), ignore it entirely rather than forcing a connection:\n"
             f"{joined}"
         )
 
@@ -511,13 +520,16 @@ def _generate_cards(transcript, api_key, card_type, cards_per_chunk, model, prog
         progress(f"Generating cards for section {i}/{len(chunks)}…")
         msg = (
             f"{type_instruction} "
-            f"Generate up to {cards_per_chunk} cards from the following lecture content. "
+            f"Decide for yourself how many cards this content actually warrants — judge by how much is "
+            f"genuinely high-yield and testable, not by any target number. Do not pad with filler cards to "
+            f"reach a count, and do not omit a genuinely high-yield fact to stay under one. As a hard safety "
+            f"ceiling only (not a target), do not exceed {cards_per_chunk} cards for this section. "
             f"Focus on high-yield medical facts, mechanisms, definitions, and clinical pearls.\n\n"
             f"CONTENT:\n{chunk}"
             f"{reference_block}"
         )
         resp = client.messages.create(
-            model=model, max_tokens=4096,
+            model=model, max_tokens=6144,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": msg}],
         )
