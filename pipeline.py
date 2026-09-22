@@ -80,6 +80,21 @@ hr#answer { border: none; border-top: 2px solid #e0e0e0; margin: 20px 0; }
 /* Cloze */
 .cloze { font-weight: bold; color: #0070f3; }
 .cloze b { font-weight: bold; color: #0070f3; }
+
+/* Night Mode — Anki desktop (2.1.20+), AnkiDroid, and AnkiMobile all add a
+   "night_mode" class to the card element when the user has dark mode on.
+   Without this, light-mode colors above would stay hardcoded and either be
+   invisible (white-on-white) or unreadable (dark-on-dark) depending on which
+   way it was hardcoded — so both palettes are defined and Anki picks
+   whichever one applies via this class, per user, automatically. */
+.card.night_mode {
+  color: #f2f2f2;
+  background: #2f2f31;
+}
+.night_mode .back { color: #f2f2f2; }
+.night_mode .extra { color: #b0b0b0; border-top-color: #4a4a4c; }
+.night_mode hr#answer { border-top-color: #4a4a4c; }
+.night_mode .cloze, .night_mode .cloze b { color: #58a6ff; }
 """
 
 BASIC_MODEL = genanki.Model(
