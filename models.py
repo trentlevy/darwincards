@@ -56,11 +56,18 @@ class Job(Base):
     """Tracks generation jobs — stored in DB so they survive container restarts."""
     __tablename__ = "jobs"
     id           = Column(String, primary_key=True)
-    status       = Column(String, default="running")   # running / done / error
+    status       = Column(String, default="running")   # running / review / done / error
     messages_json = Column(Text, default="[]")          # JSON array of progress strings
     apkg_data    = Column(LargeBinary, nullable=True)  # completed .apkg bytes
     error        = Column(String, nullable=True)
     created_at   = Column(DateTime, default=datetime.datetime.utcnow)
+
+    # Added for the swipe-review step: cards are generated and held here
+    # (status="review") before the user picks which to keep and the final
+    # .apkg gets built from just those.
+    cards_json   = Column(Text, nullable=True)  # JSON array of generated card dicts, pre-review
+    tags_json    = Column(Text, nullable=True)  # JSON array of tags to apply to the final deck
+    deck_name    = Column(String, nullable=True)  # deck name to use when finalizing
 
 
 class NoteChunk(Base):

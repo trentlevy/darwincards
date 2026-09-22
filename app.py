@@ -31,15 +31,19 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
-from database import Base, engine, get_db, SessionLocal
+from database import Base, engine, get_db, SessionLocal, ensure_columns
 from models import GlobalUsage, GenerationLog, Job
-from pipeline import generate_cards_from_file
+from pipeline import generate_cards_from_file, build_apkg
 
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
 
 Base.metadata.create_all(bind=engine)
+# The swipe-review feature added columns to the pre-existing `jobs` table —
+# create_all only creates brand-new tables, so existing installs need these
+# added explicitly. Safe/idempotent: no-ops once the columns are there.
+ensure_columns("jobs", {"cards_json": "TEXT", "tags_json": "TEXT", "deck_name": "VARCHAR"})
 
 app = FastAPI(title="DarwinCards")
 
@@ -199,7 +203,7 @@ def _run_pipeline(job_id, ip_address, file_paths,
         _job_append_message(job_id, msg)
 
     try:
-        apkg_path, usage_stats = generate_cards_from_file(
+        cards, tags, usage_stats = generate_cards_from_file(
             file_paths=file_paths,
             anthropic_api_key=anthropic_key,
             deck_name=deck_name,
@@ -215,24 +219,19 @@ def _run_pipeline(job_id, ip_address, file_paths,
             progress=progress,
         )
 
-        # Read apkg bytes and store in DB so download survives restarts
-        with open(apkg_path, "rb") as f:
-            apkg_data = f.read()
-        try:
-            os.remove(apkg_path)
-        except OSError:
-            pass
-
         db = SessionLocal()
         try:
             job = db.query(Job).filter(Job.id == job_id).first()
             if job:
                 msgs = json.loads(job.messages_json or "[]")
-                msgs.append("__DONE__")
+                msgs.append("__REVIEW__")
                 job.messages_json = json.dumps(msgs)
-                job.status    = "done"
-                job.apkg_data = apkg_data
-            # Log cost
+                job.status     = "review"
+                job.cards_json = json.dumps(cards)
+                job.tags_json  = json.dumps(tags)
+                job.deck_name  = deck_name
+            # Log cost now — it's already been spent on generation, regardless
+            # of how many cards the user ends up keeping in review.
             db.add(GenerationLog(
                 ip_address=ip_address,
                 estimated_cost_usd=usage_stats["estimated_cost_usd"],
@@ -272,6 +271,64 @@ def _run_pipeline(job_id, ip_address, file_paths,
                 os.remove(p)
             except OSError:
                 pass
+
+
+# ---------------------------------------------------------------------------
+# Review — fetch generated cards, then finalize the deck from kept ones
+# ---------------------------------------------------------------------------
+
+@app.get("/api/cards/{job_id}")
+def get_cards(job_id: str, db: Session = Depends(get_db)):
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.status != "review" or job.cards_json is None:
+        raise HTTPException(status_code=400, detail="Job has no cards ready for review")
+    return {
+        "deck_name": job.deck_name,
+        "cards": json.loads(job.cards_json),
+    }
+
+
+@app.post("/api/finalize/{job_id}")
+async def finalize_deck(job_id: str, request: Request, db: Session = Depends(get_db)):
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.status != "review" or job.cards_json is None:
+        raise HTTPException(status_code=400, detail="Job has no cards ready for review")
+
+    body = await request.json()
+    kept_indices = body.get("kept_indices")
+    if not isinstance(kept_indices, list) or not kept_indices:
+        raise HTTPException(status_code=400, detail="Keep at least one card before finalizing.")
+
+    all_cards = json.loads(job.cards_json)
+    tags = json.loads(job.tags_json or "[]")
+    try:
+        kept_set = {int(i) for i in kept_indices}
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="kept_indices must be a list of integers")
+    kept_cards = [c for i, c in enumerate(all_cards) if i in kept_set]
+    if not kept_cards:
+        raise HTTPException(status_code=400, detail="Keep at least one card before finalizing.")
+
+    apkg_path = build_apkg(kept_cards, job.deck_name or "DarwinCards", tags)
+    with open(apkg_path, "rb") as f:
+        apkg_data = f.read()
+    try:
+        os.remove(apkg_path)
+    except OSError:
+        pass
+
+    job.apkg_data = apkg_data
+    job.status = "done"
+    msgs = json.loads(job.messages_json or "[]")
+    msgs.append("__DONE__")
+    job.messages_json = json.dumps(msgs)
+    db.commit()
+
+    return {"status": "done", "kept": len(kept_cards), "discarded": len(all_cards) - len(kept_cards)}
 
 
 # ---------------------------------------------------------------------------

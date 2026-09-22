@@ -189,7 +189,9 @@ def generate_cards_from_file(
     """
     Accepts one or more files: transcripts (.txt), PDF slides (.pdf), or PowerPoint (.pptx/.ppt).
     Multiple files are merged into a single transcript before card generation.
-    Returns (apkg_path, usage_stats).
+    Returns (cards, tags, usage_stats) — call build_apkg(cards, deck_name, tags)
+    once the caller has run its own keep/discard review step, or immediately
+    with the full list to skip review.
     """
     # Build hierarchical tag base: DeckName::Course::LectureTopic
     root = _slugify(deck_name)
@@ -281,8 +283,7 @@ def generate_cards_from_file(
             progress(f"Auto-tagging skipped: {e}")
 
     all_cards = cards + image_cards
-    progress(f"Building .apkg deck with {len(all_cards)} card(s) ({len(image_cards)} image)…")
-    apkg_path = _build_apkg(all_cards, deck_name, tags)
+    progress(f"Generated {len(all_cards)} card(s) ({len(image_cards)} image) — ready for review")
 
     total_in  = input_tokens  + img_input_tokens
     total_out = output_tokens + img_output_tokens
@@ -292,7 +293,20 @@ def generate_cards_from_file(
         "output_tokens": total_out,
         "estimated_cost_usd": _estimate_cost(claude_model, total_in, total_out),
     }
-    return apkg_path, usage_stats
+    # NOTE: this used to also build the .apkg here and return its path. It now
+    # stops after generating cards so the caller can run a keep/discard review
+    # step first — see build_apkg() below, called once the user has picked
+    # which cards to keep.
+    return all_cards, tags, usage_stats
+
+
+def build_apkg(cards: List[Dict], deck_name: str, tags: List[str]) -> str:
+    """
+    Build the final .apkg from a (possibly review-filtered) list of cards.
+    Split out from generate_cards_from_file() so a review step can sit
+    between "cards generated" and "deck packaged".
+    """
+    return _build_apkg(cards, deck_name, tags)
 
 
 # ---------------------------------------------------------------------------

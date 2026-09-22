@@ -404,6 +404,67 @@
     }
     .btn-ghost:hover { background: var(--surface); }
 
+    /* ── Card review (swipe) ── */
+    .review-progress {
+      text-align: center; font-size: .78rem; color: var(--text-muted);
+      margin-bottom: .9rem; font-weight: 600;
+    }
+    .review-stage {
+      position: relative;
+      height: 300px;
+      margin-bottom: 1.1rem;
+      touch-action: none;
+      user-select: none;
+    }
+    .review-card {
+      position: absolute; inset: 0;
+      z-index: 1;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 4px 18px rgba(0,0,0,.10);
+      padding: 1.4rem 1.3rem;
+      display: flex; flex-direction: column;
+      cursor: grab;
+      overflow-y: auto;
+    }
+    .review-card:active { cursor: grabbing; }
+    .review-question, .review-answer {
+      flex: 1;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: .5rem;
+      text-align: center;
+      min-height: 0;
+    }
+    .review-question { font-size: 1.05rem; font-weight: 600; line-height: 1.5; color: var(--text); }
+    .review-answer   { font-size: .95rem; font-weight: 500; line-height: 1.5; color: var(--text); }
+    .review-divider  { border: none; border-top: 2px dashed var(--border); margin: .6rem 0; flex-shrink: 0; }
+    .review-extra { font-size: .8rem; font-weight: 400; color: var(--text-muted); line-height: 1.5; }
+    .review-img img { max-width: 100%; max-height: 110px; border-radius: 8px; display: block; margin: 0 auto; }
+    .cloze       { color: #0070f3; font-weight: 700; }
+    .cloze-blank { color: var(--text-muted); font-weight: 700; border-bottom: 2px dotted var(--text-muted); padding: 0 .3rem; }
+
+    .review-stamp {
+      position: absolute; top: 1rem;
+      z-index: 2;
+      font-size: .78rem; font-weight: 800; letter-spacing: .08em;
+      padding: .3rem .7rem; border-radius: 6px; border: 2px solid;
+      background: #fff;
+      opacity: 0; pointer-events: none; text-transform: uppercase;
+      transition: opacity .05s linear;
+    }
+    .review-stamp.keep    { right: 1rem;  color: #059669; border-color: #059669; }
+    .review-stamp.discard { left: 1rem;   color: #dc2626; border-color: #dc2626; }
+
+    .review-actions { display: flex; gap: .6rem; margin-bottom: .5rem; }
+    .btn-discard, .btn-keep {
+      flex: 1; padding: .7rem; border-radius: 8px; border: none;
+      font-size: .85rem; font-weight: 700; cursor: pointer; color: #fff;
+    }
+    .btn-discard { background: linear-gradient(135deg, #ef4444, #dc2626); }
+    .btn-keep    { background: linear-gradient(135deg, #10b981, #059669); }
+    .review-hotkeys { text-align: center; font-size: .7rem; color: var(--text-muted); margin-bottom: .8rem; }
+
     .error-inline {
       background: rgba(220,38,38,.1); border: 1px solid rgba(220,38,38,.25);
       border-radius: 7px; padding: .75rem; color: #f87171;
@@ -493,12 +554,32 @@
     </div>
   </div>
 
+  <div id="review-section" style="display:none;">
+    <div class="card">
+      <div class="card-header">Review your cards</div>
+      <div class="card-body">
+        <div class="review-progress" id="review-progress">1 / 1</div>
+        <div class="review-stage">
+          <div class="review-stamp discard" id="review-stamp-discard">Discard</div>
+          <div class="review-stamp keep" id="review-stamp-keep">Keep</div>
+          <div class="review-card" id="review-card"></div>
+        </div>
+        <div class="review-actions">
+          <button class="btn-discard" onclick="reviewDiscard()">✕ Discard</button>
+          <button class="btn-keep" onclick="reviewKeep()">✓ Keep</button>
+        </div>
+        <div class="review-hotkeys">← discard · → keep</div>
+        <button class="btn-ghost" id="keep-all-btn" onclick="reviewKeepAllRemaining()">Keep all remaining &amp; finish</button>
+      </div>
+    </div>
+  </div>
+
   <div id="download-section">
     <div class="card">
       <div class="card-body">
         <div class="result-banner success">
           <h3>Your deck is ready</h3>
-          <p>Double-click the .apkg to import into Anki</p>
+          <p id="download-summary">Double-click the .apkg to import into Anki</p>
         </div>
         <a id="download-btn" class="btn-download" href="#" download>Download .apkg Deck</a>
         <button class="btn-ghost" onclick="restart()">Generate another deck</button>
@@ -934,18 +1015,15 @@ async function startGeneration() {
       const msgs = d.messages || [];
       for (let i = seen; i < msgs.length; i++) {
         const msg = msgs[i];
-        if (msg.startsWith('__DONE__')) {
+        if (msg.startsWith('__REVIEW__')) {
           markLastDone();
           setOrbState('done');
-          document.getElementById('orb-icon').textContent  = '✓';
-          document.getElementById('orb-title').textContent = 'Deck ready!';
-          document.getElementById('orb-sub').textContent   = 'Download below';
+          document.getElementById('orb-icon').textContent  = '👀';
+          document.getElementById('orb-title').textContent = 'Ready to review';
+          document.getElementById('orb-sub').textContent   = 'Swipe through your cards below';
           document.getElementById('orb-file-name').textContent = '';
           document.getElementById('progress-section').style.display = 'none';
-          document.getElementById('download-btn').href = `/api/download/${jobId}`;
-          document.getElementById('download-section').style.display = 'block';
-          document.getElementById('download-section').scrollIntoView({behavior:'smooth'});
-          document.getElementById('generate-btn').disabled = false;
+          startReview(jobId);
           return;
         } else if (msg.startsWith('__ERROR__')) {
           showErr(msg.replace('__ERROR__', '')); return;
@@ -962,6 +1040,191 @@ async function startGeneration() {
   }
   setTimeout(poll, 1000);
 }
+
+// ---------------------------------------------------------------------------
+// Card review (swipe keep/discard)
+// ---------------------------------------------------------------------------
+
+let reviewJobId = null;
+let reviewCards = [];
+let reviewIndex = 0;
+let reviewKept = [];
+let reviewDragStartX = 0;
+let reviewDragging = false;
+let reviewDragX = 0;
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function startReview(jobId) {
+  reviewJobId = jobId;
+  try {
+    const r = await fetch(`/api/cards/${jobId}`);
+    if (!r.ok) throw new Error('Could not load cards for review.');
+    const data = await r.json();
+    reviewCards = data.cards || [];
+  } catch (err) {
+    showErr(err.message);
+    return;
+  }
+  if (!reviewCards.length) { showErr('No cards were generated.'); return; }
+  reviewIndex = 0;
+  reviewKept = [];
+  document.getElementById('review-section').style.display = 'block';
+  document.getElementById('review-section').scrollIntoView({behavior:'smooth'});
+  renderReviewCard();
+  window.addEventListener('keydown', reviewKeyHandler);
+}
+
+function reviewKeyHandler(e) {
+  if (document.getElementById('review-section').style.display === 'none') return;
+  if (e.key === 'ArrowLeft')  { e.preventDefault(); reviewDiscard(); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); reviewKeep(); }
+}
+
+function currentReviewCard() { return reviewCards[reviewIndex]; }
+
+// Question (top) and answer (bottom) are always both visible, split by a
+// dashed divider — no reveal/tap step for any card type, since the goal is
+// fast visual triage (does this card look right?), not testing recall.
+function renderReviewCard() {
+  document.getElementById('review-progress').textContent = `${reviewIndex + 1} / ${reviewCards.length}`;
+  const card = currentReviewCard();
+  const el = document.getElementById('review-card');
+  el.style.transition = 'none';
+  el.style.transform = 'translateX(0) rotate(0)';
+  document.getElementById('review-stamp-keep').style.opacity = 0;
+  document.getElementById('review-stamp-discard').style.opacity = 0;
+
+  if (!card) { el.innerHTML = ''; return; }
+
+  let questionHtml, answerHtml;
+
+  if (card.type === 'cloze') {
+    // Question: blank out the cloze term. Answer: same text with the term
+    // filled in and highlighted blue, plus any extra/pearl text.
+    questionHtml = escapeHtml(card.front).replace(/\{\{c\d+::(.*?)\}\}/g, '<span class="cloze-blank">[...]</span>');
+    const filledHtml = escapeHtml(card.front).replace(/\{\{c\d+::(.*?)\}\}/g, '<span class="cloze">$1</span>');
+    answerHtml = filledHtml + (card.back ? `<div class="review-extra">${escapeHtml(card.back)}</div>` : '');
+  } else if (card.type === 'image') {
+    questionHtml = `${escapeHtml(card.front || card.question || '')}<div class="review-img">${card.image || ''}</div>`;
+    answerHtml = escapeHtml(card.back || card.answer || '');
+  } else {
+    questionHtml = escapeHtml(card.front);
+    answerHtml = escapeHtml(card.back);
+  }
+
+  el.innerHTML = `
+    <div class="review-question">${questionHtml}</div>
+    <div class="review-divider"></div>
+    <div class="review-answer">${answerHtml}</div>`;
+  el.onclick = null;
+}
+
+function reviewAdvance(keepThis) {
+  if (keepThis) reviewKept.push(reviewIndex);
+  reviewIndex += 1;
+  if (reviewIndex >= reviewCards.length) {
+    finalizeReview();
+  } else {
+    renderReviewCard();
+  }
+}
+
+function reviewKeep()    { animateSwipeOut(1, () => reviewAdvance(true)); }
+function reviewDiscard() { animateSwipeOut(-1, () => reviewAdvance(false)); }
+
+function animateSwipeOut(direction, done) {
+  const el = document.getElementById('review-card');
+  el.style.transition = 'transform .25s ease-out, opacity .25s ease-out';
+  el.style.transform = `translateX(${direction * 500}px) rotate(${direction * 20}deg)`;
+  el.style.opacity = '0';
+  setTimeout(() => { el.style.opacity = '1'; done(); }, 220);
+}
+
+function reviewKeepAllRemaining() {
+  for (let i = reviewIndex; i < reviewCards.length; i++) reviewKept.push(i);
+  reviewIndex = reviewCards.length;
+  finalizeReview();
+}
+
+async function finalizeReview() {
+  window.removeEventListener('keydown', reviewKeyHandler);
+  document.getElementById('review-section').style.display = 'none';
+  document.getElementById('orb-title').textContent = 'Building your deck…';
+  document.getElementById('orb-sub').textContent   = '';
+  try {
+    const r = await fetch(`/api/finalize/${reviewJobId}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({kept_indices: reviewKept}),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.detail || 'Could not finalize deck.');
+
+    document.getElementById('orb-icon').textContent  = '✓';
+    document.getElementById('orb-title').textContent = 'Deck ready!';
+    document.getElementById('orb-sub').textContent   = 'Download below';
+    document.getElementById('download-summary').textContent =
+      `Kept ${data.kept} card${data.kept === 1 ? '' : 's'}` +
+      (data.discarded ? `, discarded ${data.discarded}` : '') +
+      ' — double-click the .apkg to import into Anki';
+    document.getElementById('download-btn').href = `/api/download/${reviewJobId}`;
+    document.getElementById('download-section').style.display = 'block';
+    document.getElementById('download-section').scrollIntoView({behavior:'smooth'});
+    document.getElementById('generate-btn').disabled = false;
+  } catch (err) {
+    showErr(err.message);
+  }
+}
+
+// Drag-to-swipe (mouse + touch)
+(function setupReviewDrag() {
+  const stage = document.querySelector('.review-stage');
+  if (!stage) return;
+
+  function getX(e) { return e.touches ? e.touches[0].clientX : e.clientX; }
+
+  function onDown(e) {
+    if (document.getElementById('review-section').style.display === 'none') return;
+    reviewDragging = true;
+    reviewDragStartX = getX(e);
+    document.getElementById('review-card').style.transition = 'none';
+  }
+  function onMove(e) {
+    if (!reviewDragging) return;
+    reviewDragX = getX(e) - reviewDragStartX;
+    const el = document.getElementById('review-card');
+    el.style.transform = `translateX(${reviewDragX}px) rotate(${reviewDragX / 18}deg)`;
+    const keepStamp = document.getElementById('review-stamp-keep');
+    const discardStamp = document.getElementById('review-stamp-discard');
+    keepStamp.style.opacity = Math.max(0, Math.min(1, reviewDragX / 100));
+    discardStamp.style.opacity = Math.max(0, Math.min(1, -reviewDragX / 100));
+  }
+  function onUp() {
+    if (!reviewDragging) return;
+    reviewDragging = false;
+    const threshold = 100;
+    if (reviewDragX > threshold) reviewKeep();
+    else if (reviewDragX < -threshold) reviewDiscard();
+    else {
+      const el = document.getElementById('review-card');
+      el.style.transition = 'transform .2s ease-out';
+      el.style.transform = 'translateX(0) rotate(0)';
+      document.getElementById('review-stamp-keep').style.opacity = 0;
+      document.getElementById('review-stamp-discard').style.opacity = 0;
+    }
+    reviewDragX = 0;
+  }
+
+  stage.addEventListener('mousedown', onDown);
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+  stage.addEventListener('touchstart', onDown, {passive: true});
+  window.addEventListener('touchmove', onMove, {passive: true});
+  window.addEventListener('touchend', onUp);
+})();
 
 function showLimit(title, msg) {
   setOrbState(null); resetOrbLabel();
@@ -1004,7 +1267,10 @@ function restart() {
   selectedFiles = [];
   document.getElementById('download-section').style.display = 'none';
   document.getElementById('progress-section').style.display = 'none';
+  document.getElementById('review-section').style.display   = 'none';
   document.getElementById('limit-section').style.display    = 'none';
+  window.removeEventListener('keydown', reviewKeyHandler);
+  reviewJobId = null; reviewCards = []; reviewIndex = 0; reviewKept = [];
   setOrbState(null); resetOrbLabel();
   document.querySelectorAll('.fmt-pill').forEach(p => p.classList.remove('active'));
   logLines = [];
