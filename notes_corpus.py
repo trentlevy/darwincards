@@ -26,8 +26,17 @@ from sqlalchemy.orm import Session
 from database import SessionLocal
 from models import NoteChunk
 
-CHUNK_WORDS = 700
-CHUNK_OVERLAP_WORDS = 100
+# Student notes are usually one-fact-per-bullet outlines, so a chunk should
+# be a small cluster of related bullets (itemized reference material) —
+# not an arbitrary word-count slice that mashes several unrelated facts
+# together. MAX_CHUNK_WORDS caps how many bullets get grouped into one
+# retrieval unit before starting a new chunk (still under the same heading).
+MAX_CHUNK_WORDS = 90
+
+# Fallback for sources with no bullet-level structure (PDF/PPTX/TXT, or a
+# .docx with no headings at all) — same idea, smaller slices than before.
+CHUNK_WORDS = 200
+CHUNK_OVERLAP_WORDS = 30
 
 SUPPORTED_NOTE_EXTS = {".docx", ".txt", ".pdf", ".pptx", ".ppt"}
 
@@ -73,26 +82,28 @@ def _is_heading_paragraph(para, body_size: float) -> bool:
     return bigger or (text.isupper() and len(text.split()) <= 12)
 
 
-def _extract_docx_sections(path: str) -> List[Tuple[Optional[str], str]]:
+def _extract_docx_sections(path: str) -> List[Tuple[Optional[str], List[str]]]:
     """
-    Return [(heading_or_None, text_block), ...], splitting on section
-    headings so a giant combined doc still yields per-topic sections instead
-    of one undifferentiated blob. Tries Word's built-in heading styles first,
-    then falls back to the bold/larger-font/ALL-CAPS convention most student
-    notes actually use.
+    Return [(heading_or_None, [bullet_1, bullet_2, ...]), ...], splitting on
+    section headings so a giant combined doc still yields per-topic sections
+    instead of one undifferentiated blob. Tries Word's built-in heading
+    styles first, then falls back to the bold/larger-font/ALL-CAPS
+    convention most student notes actually use. Keeps each bullet/paragraph
+    as its own list item (rather than joining into one blob of text) so a
+    later step can group them into small, itemized chunks instead of
+    arbitrary word-count slices.
     """
     from docx import Document
     doc = Document(path)
     body_size = _body_font_size(doc)
 
-    sections: List[Tuple[Optional[str], str]] = []
+    sections: List[Tuple[Optional[str], List[str]]] = []
     current_heading: Optional[str] = None
     buffer: List[str] = []
 
     def flush():
-        text = "\n".join(buffer).strip()
-        if text:
-            sections.append((current_heading, text))
+        if buffer:
+            sections.append((current_heading, list(buffer)))
         buffer.clear()
 
     for para in doc.paragraphs:
@@ -110,8 +121,8 @@ def _extract_docx_sections(path: str) -> List[Tuple[Optional[str], str]]:
 
     if not sections:
         # No detectable headings at all — treat the whole doc as one section.
-        full_text = "\n".join(p.text.strip() for p in doc.paragraphs if p.text.strip())
-        sections = [(None, full_text)]
+        bullets = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+        sections = [(None, bullets)]
     return sections
 
 
@@ -130,7 +141,7 @@ def _extract_plain_sections(path: str, ext: str) -> List[Tuple[Optional[str], st
 
 
 def _chunk_words(heading: Optional[str], text: str) -> List[Tuple[Optional[str], str]]:
-    """Split one section's text into overlapping ~CHUNK_WORDS-word pieces."""
+    """Split one blob of text into overlapping ~CHUNK_WORDS-word pieces (fallback path)."""
     words = text.split()
     if len(words) <= CHUNK_WORDS:
         return [(heading, text)] if text.strip() else []
@@ -144,6 +155,33 @@ def _chunk_words(heading: Optional[str], text: str) -> List[Tuple[Optional[str],
         if i + CHUNK_WORDS >= len(words):
             break
     return pieces
+
+
+def _group_bullets(heading: Optional[str], bullets: List[str]) -> List[Tuple[Optional[str], str]]:
+    """
+    Group consecutive bullets under one heading into small itemized chunks
+    (a handful of closely-listed facts, not a whole topic's worth), capped
+    at MAX_CHUNK_WORDS. An unusually long single bullet becomes its own
+    chunk rather than being cut mid-sentence.
+    """
+    chunks: List[Tuple[Optional[str], str]] = []
+    current: List[str] = []
+    current_words = 0
+
+    def flush():
+        if current:
+            chunks.append((heading, "\n".join(current)))
+
+    for bullet in bullets:
+        n = len(bullet.split())
+        if current and current_words + n > MAX_CHUNK_WORDS:
+            flush()
+            current = []
+            current_words = 0
+        current.append(bullet)
+        current_words += n
+    flush()
+    return chunks
 
 
 # ---------------------------------------------------------------------------
@@ -165,14 +203,15 @@ def ingest_notes_file(file_path: str, school: str, source_label: Optional[str] =
 
     label = source_label or Path(file_path).name
 
-    if ext == ".docx":
-        sections = _extract_docx_sections(file_path)
-    else:
-        sections = _extract_plain_sections(file_path, ext)
-
     chunks: List[Tuple[Optional[str], str]] = []
-    for heading, text in sections:
-        chunks.extend(_chunk_words(heading, text))
+    if ext == ".docx":
+        sections = _extract_docx_sections(file_path)  # [(heading, [bullet, ...]), ...]
+        for heading, bullets in sections:
+            chunks.extend(_group_bullets(heading, bullets))
+    else:
+        sections = _extract_plain_sections(file_path, ext)  # [(heading, blob_text), ...]
+        for heading, text in sections:
+            chunks.extend(_chunk_words(heading, text))
 
     db = SessionLocal()
     try:
