@@ -69,6 +69,15 @@ class Job(Base):
     tags_json    = Column(Text, nullable=True)  # JSON array of tags to apply to the final deck
     deck_name    = Column(String, nullable=True)  # deck name to use when finalizing
 
+    # Added for quality feedback: how many cards survived the swipe review
+    # (an implicit quality signal — a deck the user discarded heavily from is
+    # a worse sign than one they kept almost entirely), plus an explicit
+    # rating/comment the user can optionally leave once the deck is ready.
+    kept_count      = Column(Integer, nullable=True)
+    discarded_count = Column(Integer, nullable=True)
+    quality_rating  = Column(Integer, nullable=True)   # 1 (AI slop) – 5 (good) star rating
+    quality_comment = Column(Text, nullable=True)      # optional free-text, e.g. what was off
+
 
 class NoteChunk(Base):
     """

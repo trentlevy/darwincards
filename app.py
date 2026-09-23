@@ -44,6 +44,17 @@ Base.metadata.create_all(bind=engine)
 # create_all only creates brand-new tables, so existing installs need these
 # added explicitly. Safe/idempotent: no-ops once the columns are there.
 ensure_columns("jobs", {"cards_json": "TEXT", "tags_json": "TEXT", "deck_name": "VARCHAR"})
+# Quality-feedback columns: kept/discarded counts (recorded automatically at
+# finalize time) plus an optional explicit rating/comment the user can leave.
+ensure_columns("jobs", {
+    "kept_count": "INTEGER",
+    "discarded_count": "INTEGER",
+    "quality_rating": "INTEGER",
+    "quality_comment": "TEXT",
+})
+
+# Set this in Railway to view /admin/feedback. Left blank, that page 403s.
+ADMIN_KEY = os.environ.get("DARWINCARDS_ADMIN_KEY", "")
 
 app = FastAPI(title="DarwinCards")
 
@@ -323,12 +334,99 @@ async def finalize_deck(job_id: str, request: Request, db: Session = Depends(get
 
     job.apkg_data = apkg_data
     job.status = "done"
+    job.kept_count = len(kept_cards)
+    job.discarded_count = len(all_cards) - len(kept_cards)
     msgs = json.loads(job.messages_json or "[]")
     msgs.append("__DONE__")
     job.messages_json = json.dumps(msgs)
     db.commit()
 
     return {"status": "done", "kept": len(kept_cards), "discarded": len(all_cards) - len(kept_cards)}
+
+
+# ---------------------------------------------------------------------------
+# Quality feedback
+# ---------------------------------------------------------------------------
+
+@app.post("/api/rate/{job_id}")
+async def rate_deck(job_id: str, request: Request, db: Session = Depends(get_db)):
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.status != "done":
+        raise HTTPException(status_code=400, detail="Deck isn't finished yet")
+
+    body = await request.json()
+    rating = body.get("rating")
+    if not isinstance(rating, int) or not (1 <= rating <= 5):
+        raise HTTPException(status_code=400, detail="rating must be an integer 1–5 (1 = AI slop, 5 = good)")
+    comment = (body.get("comment") or "").strip()[:2000]
+
+    job.quality_rating = rating
+    job.quality_comment = comment or None
+    db.commit()
+    return {"ok": True}
+
+
+@app.get("/admin/feedback", response_class=HTMLResponse)
+def admin_feedback(key: str = "", db: Session = Depends(get_db)):
+    if not ADMIN_KEY or key != ADMIN_KEY:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    jobs = (
+        db.query(Job)
+        .filter(Job.status == "done")
+        .order_by(Job.created_at.desc())
+        .limit(200)
+        .all()
+    )
+
+    rated = [j for j in jobs if j.quality_rating]
+    avg_rating = sum(j.quality_rating for j in rated) / len(rated) if rated else None
+
+    def esc(s):
+        return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    def stars(n):
+        if not n:
+            return '<span style="color:#999;">—</span>'
+        return f'<span style="color:#b8860b;letter-spacing:1px;">{"★"*n}{"☆"*(5-n)}</span>'
+
+    rows = ""
+    for j in jobs:
+        kept = j.kept_count if j.kept_count is not None else "—"
+        disc = j.discarded_count if j.discarded_count is not None else "—"
+        rows += f"""
+        <tr>
+          <td>{j.created_at.strftime('%Y-%m-%d %H:%M') if j.created_at else '—'}</td>
+          <td>{esc(j.deck_name)}</td>
+          <td>{kept}</td>
+          <td>{disc}</td>
+          <td>{stars(j.quality_rating)}</td>
+          <td>{esc(j.quality_comment)}</td>
+        </tr>"""
+
+    avg_html = f"{avg_rating:.1f} / 5" if avg_rating is not None else "—"
+
+    html = f"""<!DOCTYPE html><html><head><title>DarwinCards — Feedback</title>
+    <style>
+      body {{ font-family: -apple-system, sans-serif; margin: 2rem; color: #1a1a1a; }}
+      h1 {{ font-size: 1.3rem; }}
+      .summary {{ margin-bottom: 1.5rem; color: #555; }}
+      table {{ border-collapse: collapse; width: 100%; font-size: .85rem; }}
+      th, td {{ text-align: left; padding: .5rem .7rem; border-bottom: 1px solid #eee; vertical-align: top; }}
+      th {{ color: #888; font-weight: 600; text-transform: uppercase; font-size: .7rem; }}
+    </style></head><body>
+    <h1>Deck feedback (last {len(jobs)} finished decks)</h1>
+    <p class="summary">
+      Rated: {len(rated)}/{len(jobs)} &middot; Average: {avg_html}
+    </p>
+    <table>
+      <tr><th>Created</th><th>Deck</th><th>Kept</th><th>Discarded</th><th>Rating</th><th>Comment</th></tr>
+      {rows}
+    </table>
+    </body></html>"""
+    return HTMLResponse(html)
 
 
 # ---------------------------------------------------------------------------
